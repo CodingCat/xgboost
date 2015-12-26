@@ -17,7 +17,7 @@ What did we do in this Init?
 
 <b>subtree/rabit/include/rabit/rabit-inl.h</b>
 
-``` 
+```c++
 105 // intialize the rabit engine                                                                                 
 106 inline void Init(int argc, char *argv[]) {                                                                    
 107   engine::Init(argc, argv);                                                                                   
@@ -27,7 +27,7 @@ What did we do in this Init?
 
 <b> subtree/rabit/src/engine.cc </b>
 
-```
+```c++
  30 /*! \brief intiialize the synchronization module */                                                           
  31 void Init(int argc, char *argv[]) {                                                                           
  32   for (int i = 1; i < argc; ++i) {                                                                            
@@ -43,7 +43,7 @@ What did we do in this Init?
 
 `manager ` is the instance of one of the three types of engine, which is defined in the same file:
 
-```
+```c++
  19 // singleton sync manager                                                                                     
  20 #ifndef RABIT_USE_BASE                                                                                        
  21 #ifndef RABIT_USE_MOCK                                                                                        
@@ -60,7 +60,7 @@ Let's focus on the `AllreduceRobust`. AllreduceRobust implements the `Init()` as
 
 <b>subtree/rabit/src/allreduce_robust.cc</b>
 
-```
+```c++
   34 void AllreduceRobust::Init(void) {                                                                            
   35   AllreduceBase::Init();                                                                                      
   36   result_buffer_round = std::max(world_size / num_global_replica, 1);                                         
@@ -75,7 +75,7 @@ Now, we go into details of `AllreduceBase:Init(void) `:
 
 <b>subtree/rabit/src/allreduce_base.cc</b>
 
-```
+```c++
  53 // initialization function                                                                                    
  54 void AllreduceBase::Init(void) {                                                                              
  55   // setup from enviroment variables                                                                          
@@ -164,7 +164,7 @@ The above lines connect with the Tracker and start the handshaking process with 
 
 <b>subtree/rabit/src/allreduce_base.cc</b> 
 
-```
+```c++
 214   using utils::Assert;                                                                                        
 215   Assert(tracker.SendAll(&magic, sizeof(magic)) == sizeof(magic),                                             
 216          "ReConnectLink failure 1");                                                                          
@@ -182,7 +182,7 @@ The above lines connect with the Tracker and start the handshaking process with 
 
 <b>subtree/rabit/src/allreduce_base.cc</b>
 
-```                                                                      
+```c++                                                                      
 238                                                                                                               
 239   // the rank of previous link, next link in ring                                                             
 240   int prev_rank, next_rank;                                                                                   
@@ -223,7 +223,7 @@ Tracker process calls `accept_slaves(nslave)` to wait for the client connections
 
 <b>subtree/rabit/tracker/rabit_tracker.py</b>
 
-```
+```python
 245     def accept_slaves(self, nslave):                                                                          
 246         # set of nodes that finishs the job                                                                   
 247         shutdown = {}                                                                                         
@@ -243,19 +243,9 @@ Tracker process calls `accept_slaves(nslave)` to wait for the client connections
 
 The SlaveEntry constructor contains the process of receiving information via socket, the process corresponds to the sending order in ``ConnectTracker()`.
 
+<b>subtree/rabit/tracker/rabit_tracker.py</b>
 
-```                                                                     
-260             if s.cmd == 'print':                                                                              
-261                 msg = s.sock.recvstr()                                                                        
-262                 self.handle_print(s, msg)                                                                     
-263                 continue                                                                                      
-264             if s.cmd == 'shutdown':                                                                           
-265                 assert s.rank >= 0 and s.rank not in shutdown                                                 
-266                 assert s.rank not in wait_conn                                                                
-267                 shutdown[s.rank] = s                                                                          
-268                 self.log_print('Recieve %s signal from %d' % (s.cmd, s.rank), 1)                              
-269                 continue                                                                                      
-270             assert s.cmd == 'start' or s.cmd == 'recover'
+```python                                                                     
 271             # lazily initialize the slaves                                                                    
 272             if tree_map == None:                                                                              
 273                 assert s.cmd == 'start'                                                                       
@@ -270,8 +260,9 @@ The SlaveEntry constructor contains the process of receiving information via soc
 
 The magic here is `get_link_map`: (TODO)
 
+<b>subtree/rabit/tracker/rabit_tracker.py</b>
 
-```                 
+```python                 
 281             if s.cmd == 'recover':                                                                            
 282                 assert s.rank >= 0                                                                            
 283                                                                                                               
@@ -310,7 +301,7 @@ The magic here is `get_link_map`: (TODO)
 
 <b>subtree/rabit/src/allreduce_base.cc</b>
 
-```
+```c++
 257   for (int i = 0; i < num_neighbors; ++i) {                                                                   
 258     int nrank;                                                                                                
 259     Assert(tracker.RecvAll(&nrank, sizeof(nrank)) == sizeof(nrank),                                           
