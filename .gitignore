@@ -74,3 +74,6 @@ config.mk
 xgboost
 *.data
 build_plugin
+.idea_modules
+target
+*.iml
