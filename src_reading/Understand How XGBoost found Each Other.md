@@ -206,6 +206,8 @@ The above lines connect with the Tracker and start the handshaking process with 
 
 After the connection is established, the new node is trying to receive various types of information from Tracker. Briefly, `RecvAll` is a wrapper of socket function which reads all data from remote end in blocking fashion. To understand this code block, we need to see the handshaking protocol between the node and the tracker. We move forward to <b>subtree/rabit/tracker/rabit_tracker.py</b>
 
+###Tracker###
+
 The main function is Tracker is implemented as 
 
 ```python
@@ -258,7 +260,42 @@ The SlaveEntry constructor contains the process of receiving information via soc
 280                 assert s.world_size == -1 or s.world_size == nslave                          
 ```
 
-The magic here is `get_link_map`: (TODO)
+The magic here is `get_link_map` (note that this function is only called when tree_map is not initialized already): 
+
+<b>subtree/rabit/tracker/rabit_tracker.py</b>
+
+```python 
+208     def get_link_map(self, nslave):                                                                           
+209         """                                                                                                   
+210         get the link map, this is a bit hacky, call for better algorithm                                      
+211         to place similar nodes together                                                                       
+212         """                                                                                                   
+213         tree_map, parent_map = self.get_tree(nslave)                                                          
+214         ring_map = self.get_ring(tree_map, parent_map)                                                        
+215         rmap = {0 : 0}                                                                                        
+216         k = 0                                                                                                 
+217         for i in range(nslave - 1):                                                                           
+218             k = ring_map[k][1]                                                                                
+219             rmap[k] = i + 1                                                                                   
+220                                                                                                               
+221         ring_map_ = {}                                                                                        
+222         tree_map_ = {}                                                                                        
+223         parent_map_ ={}                                                                                       
+224         for k, v in ring_map.items():                                                                         
+225             ring_map_[rmap[k]] = (rmap[v[0]], rmap[v[1]])                                                     
+226         for k, v in tree_map.items():                                                                         
+227             tree_map_[rmap[k]] = [rmap[x] for x in v]                                                         
+228         for k, v in parent_map.items():                                                                       
+229             if k != 0:                                                                                        
+230                 parent_map_[rmap[k]] = rmap[v]                                                                
+231             else:                                                                                             
+232                 parent_map_[rmap[k]] = -1                                                                     
+233         return tree_map_, parent_map_, ring_map_ 
+```
+
+This function gets the topology of the tasks. In Rabit, we have two types of topology, tree\_map and ring\_map, where the latter one is derived from the first one (Line 214). 
+
+After we get the tree\_map and ring\_map, we will assign the rank of the newly connected worker. This functionality is still implemented in accept\_slaves as the following lines.
 
 <b>subtree/rabit/tracker/rabit_tracker.py</b>
 
@@ -266,7 +303,24 @@ The magic here is `get_link_map`: (TODO)
 281             if s.cmd == 'recover':                                                                            
 282                 assert s.rank >= 0                                                                            
 283                                                                                                               
-284             rank = s.decide_rank(job_map)                                                                     
+284             rank = s.decide_rank(job_map) 
+```
+We first look at this decide\_rank,
+
+```python 
+61     def decide_rank(self, job_map):                                                                           
+62         if self.rank >= 0:                                                                                    
+63             return self.rank                                                                                  
+64         if self.jobid != 'NULL' and self.jobid in job_map:                                                    
+65             return job_map[self.jobid]                                                                        
+66         return -1   
+```
+
+If the rank has been assigned, it will return the ready rank directly. If the job\_map has been built, it will read from job\_map, otherwise, it returns -1 indicating that we need to assign the rank in batch. job\_map is the data structure mapping the job id to the node's rank.
+
+In the following code snippet, it assigns the rank to the node according to tree\_map and ring\_map.
+
+```python                                                                     
 285             # batch assignment of ranks                                                                       
 286             if rank == -1:                                                                                    
 287                 assert len(todo_nodes) != 0                                                                   
@@ -295,9 +349,9 @@ The magic here is `get_link_map`: (TODO)
 ```
 
 
+### Building the Neighborhood Relationship ###
 
-
-
+The following lines in the 
 
 <b>subtree/rabit/src/allreduce_base.cc</b>
 
@@ -425,3 +479,5 @@ The magic here is `get_link_map`: (TODO)
 377          "cannot find next ring in the link");                                                                
 378 }
 ```
+
+the above code are building neighborhood relationship
