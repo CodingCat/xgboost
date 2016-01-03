@@ -11,12 +11,11 @@ public interface XGBoostLibrary extends Library {
 
   // extend this to create a callback that will fill a data layer
   interface java_callback_t extends Callback {
-    void invoke(Pointer data, int batch_size, int num_dims, Pointer shape);
+    void invoke(Pointer matrix, long[] indptr, int[] indices, float[] data);
   }
 
-  int set_train_data_callback(Pointer state, java_callback_t callback);
+  int set_train_data_callback(Pointer xgboostState, java_callback_t callback);
+  int set_test_data_callback(Pointer xgboostState, java_callback_t callback);
 
-  int set_test_data_callback(Pointer state, java_callback_t callback);
-
-
+  int run();
 }

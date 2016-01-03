@@ -3,11 +3,11 @@ import sbtassembly.Plugin.{MergeStrategy, PathList}
 
 assemblySettings
 
-name := "XGBoostSpark"
+name := "xgboostspark"
 
 version := "0.1"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.10.5"
 
 test in assembly :={}
 
@@ -18,10 +18,9 @@ fork := true
 resolvers += "sonatype-releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" % "akka-contrib_2.10" % "2.3.8",
+  "org.apache.spark" % "spark-mllib_2.10" % "1.5.1",
   "com.typesafe" % "config" % "1.2.1",
   "org.scalanlp" %% "breeze" % "0.11.1",
-  "com.typesafe.akka" % "akka-testkit_2.10" % "2.3.8",
   "junit" % "junit" % "4.11",
   "com.novocode" % "junit-interface" % "0.11" % "test",
   "org.scalatest" % "scalatest_2.10" % "2.2.5",
