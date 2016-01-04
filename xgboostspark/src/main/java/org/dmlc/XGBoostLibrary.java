@@ -11,7 +11,7 @@ interface XGBoostLibrary extends Library {
 
   // extend this to create a callback that will fill a data layer
   interface java_callback_t extends Callback {
-    void invoke(Pointer matrix, long[] indptr, int[] indices, float[] data);
+    void invoke(Pointer matrix, Pointer indptr, Pointer indices, Pointer data);
   }
 
   int set_train_data_callback(Pointer xgBooster, java_callback_t callback);
@@ -19,8 +19,8 @@ interface XGBoostLibrary extends Library {
 
   int set_param(String param_name, String param_value);
 
-  int train();
-  int test();
+  int train(int iterNum, Pointer gradient, Pointer hess);
+  int test(int option_mask, long ntree_limit);
 
   // extensions for using Spark's communication module
   Pointer get_weights();
