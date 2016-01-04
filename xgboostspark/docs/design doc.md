@@ -45,7 +45,7 @@ We provide the following methods in `XGBoostLibrary`
 ```java
 // extend this to create a callback that will fill a data layer
   interface java_callback_t extends Callback {
-    void invoke(Pointer matrix, long[] indptr, int[] indices, float[] data);
+    void invoke(Pointer matrix, Pointer indptr, Pointer indices, Pointer data);
   }
 ```
 
