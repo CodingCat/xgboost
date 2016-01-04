@@ -3,10 +3,9 @@ package org.dmlc.tracker
 import com.typesafe.config.Config
 
 
-class JobTracker(conf: Config) {
+private[dmlc] class JobTracker(conf: Config) {
 
-
-  private def startRabitTracker(): Unit = {
+  def startRabitTracker(): Unit = {
     //TODO: start the rabit tracker
   }
 

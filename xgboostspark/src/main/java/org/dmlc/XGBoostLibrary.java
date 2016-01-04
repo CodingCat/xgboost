@@ -5,7 +5,7 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 
-public interface XGBoostLibrary extends Library {
+interface XGBoostLibrary extends Library {
 
   XGBoostLibrary INSTANCE = (XGBoostLibrary) Native.loadLibrary("xgboost_wrapper", XGBoostLibrary.class);
 
@@ -14,8 +14,14 @@ public interface XGBoostLibrary extends Library {
     void invoke(Pointer matrix, long[] indptr, int[] indices, float[] data);
   }
 
-  int set_train_data_callback(Pointer xgboostState, java_callback_t callback);
-  int set_test_data_callback(Pointer xgboostState, java_callback_t callback);
+  int set_train_data_callback(Pointer xgBooster, java_callback_t callback);
+  int set_test_data_callback(Pointer xgBooster, java_callback_t callback);
 
-  int run();
+  int set_param(String param_name, String param_value);
+
+  int train();
+  int test();
+
+  // extensions for using Spark's communication module
+  Pointer get_weights();
 }
