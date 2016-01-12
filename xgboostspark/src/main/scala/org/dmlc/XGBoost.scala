@@ -63,6 +63,6 @@ object XGBoost {
     */
   def apply(params: HashMap[String, String]): XGBoost = {
     //TODO:
-    null
+    new XGBoost(XGBoostLibrary.INSTANCE)
   }
 }
