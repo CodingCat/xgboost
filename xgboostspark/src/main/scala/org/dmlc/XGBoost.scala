@@ -20,16 +20,36 @@ class XGBoost(xgBoostLib: XGBoostLibrary) {
 
   }
 
+  /**
+    * save the weights of the model
+    * @return the array of the weights
+    */
   def getWeights(): List[Double] = {
     //TODO:
     null
   }
 
-  def train(): Unit = {
+  /**
+    * train the model and synchronize the watched metrics for every monitorInterval iterations
+    * @param round the total number of iterations we run
+    * @param monitorInterval the number of iterations for watched metric synchronization
+    * @param watches the data for watches
+    */
+  def train(round: Int, monitorInterval: Int, watches: Option[Iterable[(String, Array[Byte])]] = None): Unit = {
     //TODO:
   }
 
-  def test(): Array[Double] = {
+  /**
+    * predict based on the given test set
+    * @param outPutMargin whether to output the raw untransformed margin value. (default false)
+    * @param treeLimit Limit number of trees in the prediction; defaults to 0 (use all trees).
+    * @param predLeaf When this option is on, the output will be a matrix of (nsample, ntrees), nsample = data.numRow
+            with each record indicating the predicted leaf index of each sample in each tree.
+            Note that the leaf index of a tree is unique per tree, so you may find leaf 1
+            in both tree 1 and tree 0.
+    * @return the prediction results
+    */
+  def predict(outPutMargin: Boolean = false, treeLimit: Long = 0, predLeaf: Boolean = false): Array[Array[Double]] = {
     //TODO:
     null
   }
