@@ -10,7 +10,7 @@ object XGBoostExample {
   def main(args: Array[String]): Unit = {
     val paramMaps = new HashMap[String, String]
     val booster = XGBoost(paramMaps)
-
+    System.load("/home/zhunan/code/xgboost/xgboostspark/libxgboostspark.so")
     booster.getWeights()
   }
 }
