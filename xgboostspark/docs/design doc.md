@@ -21,35 +21,15 @@ We adopt the `black-box` approach in the current design.
 
 ##### XGBoostLibrary
 
-XGBoostLibrary has two components, C++-implemented wrapper of XGBoost and the JNA interface providing the interface for other modules, `org.dmlc.XGBoostLibrary`. 
+XGBoostLibrary has two components, C++-implemented wrapper of XGBoost and the JNA interface providing the interfaces for other modules, `org.dmlc.XGBoostLibrary`. 
 
 `org.dmlc.XGBoostLibrary` is not supposed to be accessible to the user, instead, we shall provide the user interface wrapping this interface. The reason is that we do not expect the user to operate with the obscure parameter type like `com.sun.jna.Pointer`.
 
-We provide the following methods in `XGBoostLibrary`
+##### XGBoost
 
-* int set\_train\_data\_callback(Pointer xgBooster, java\_callback\_t callback): this allows the caller to set the specific callback which will be called before the C++ program runs the training process.
+XGBoost is the user-facing interface which provides the interface to the user to start XGBoost program 
 
+##### JobTracker
 
-* int set\_test\_data\_callback(Pointer xgBooster, java\_callback\_t callback): this allows the caller to set the specific callback which will be called before the C++ program runs the test process.
+JobTracker is the program maintaining the information of the rabit job and connection between the nodes
 
-
-* int set\_param(String param_name, String param_value): configure XGBoost model 
-
-* int train(): train the model 
-
-* float[] test(): 
-
-  // extensions for using Spark's communication module
-  Pointer get_weights();
-
-```java
-// extend this to create a callback that will fill a data layer
-  interface java_callback_t extends Callback {
-    void invoke(Pointer matrix, Pointer indptr, Pointer indices, Pointer data);
-  }
-```
-
-
-### Example Program ###
-
-### Future Plan ###

@@ -23,6 +23,7 @@ interface XGBoostLibrary extends Library {
 
   //move forward with steps iterations, given the gradient and hess matrix
   int train(int steps, Pointer gradient, Pointer hess);
+  //predict with the given configuration
   float[][] predict(boolean outPutMargin, long treeLimit, boolean predLeaf);
 
   float[] get_weights();
