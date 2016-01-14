@@ -67,9 +67,11 @@ java/xgboost4j-demo/model/
 nb-configuration*
 dmlc-core
 .idea
-
 recommonmark/
-
 tags
-
 xgboost
+# Eclipse
+.project
+.cproject
+.pydevproject
+.settings/

@@ -1,11 +1,11 @@
-export CC  = $(if $(shell which gcc-5),gcc-5,gcc)
-export CXX = $(if $(shell which g++-5),g++-5,g++)
+export CC  = $(if $(shell which gcc-5 2>/dev/null),gcc-5,gcc)
+export CXX = $(if $(shell which g++-5 2>/dev/null),g++-5,g++)
 
 export MPICXX = mpicxx
 export LDFLAGS= -pthread -lm
 export CFLAGS = -Wall -O3 -msse2  -Wno-unknown-pragmas -funroll-loops
 # java include path
-export JAVAINCFLAGS = -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux -I./java
+export JAVAINCFLAGS = -I${JAVA_HOME}/include -I./java
 
 ifeq ($(OS), Windows_NT)
 	export CXX = g++ -m64
@@ -16,6 +16,11 @@ UNAME= $(shell uname)
 
 ifeq ($(UNAME), Linux)
 	LDFLAGS += -lrt
+	JAVAINCFLAGS += -I${JAVA_HOME}/include/linux
+endif
+
+ifeq ($(UNAME), Darwin)
+	JAVAINCFLAGS += -I${JAVA_HOME}/include/darwin
 endif
 
 ifeq ($(no_omp),1)
@@ -71,7 +76,7 @@ else
 endif
 
 # java lib
-JLIB = java/libxgboostjavawrapper.so
+JLIB = java/libxgboost4j.so
 
 # specify tensor path
 BIN = xgboost
@@ -103,8 +108,8 @@ main.o: src/xgboost_main.cpp src/utils/*.h src/*.h src/learner/*.hpp src/learner
 xgboost:  updater.o gbm.o io.o main.o $(LIBRABIT) $(LIBDMLC)
 wrapper/xgboost_wrapper.dll wrapper/libxgboostwrapper.so: wrapper/xgboost_wrapper.cpp src/utils/*.h src/*.h src/learner/*.hpp src/learner/*.h  updater.o gbm.o io.o $(LIBRABIT) $(LIBDMLC)
 
-java: java/libxgboostjavawrapper.so
-java/libxgboostjavawrapper.so: java/xgboost4j_wrapper.cpp wrapper/xgboost_wrapper.cpp src/utils/*.h src/*.h src/learner/*.hpp src/learner/*.h  updater.o gbm.o io.o $(LIBRABIT) $(LIBDMLC)
+java: java/libxgboost4j.so
+java/libxgboost4j.so: java/xgboost4j_wrapper.cpp wrapper/xgboost_wrapper.cpp src/utils/*.h src/*.h src/learner/*.hpp src/learner/*.h  updater.o gbm.o io.o $(LIBRABIT) $(LIBDMLC)
 
 # dependency on rabit
 subtree/rabit/lib/librabit.a: subtree/rabit/src/engine.cc
@@ -177,11 +182,9 @@ Rcheck:
 	R CMD check --as-cran xgboost*.tar.gz
 
 pythonpack:
-	#make clean
+	#for pip maintainer only
 	cd subtree/rabit;make clean;cd ..
 	rm -rf xgboost-deploy xgboost*.tar.gz
-	#pip install pypandoc and also brew/apt-get install pandoc
-	python python-package/conv_rst.py
 	cp -r python-package xgboost-deploy
 	#cp *.md xgboost-deploy/
 	cp LICENSE xgboost-deploy/

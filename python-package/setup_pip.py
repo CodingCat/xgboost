@@ -11,7 +11,7 @@ sys.path.insert(0, '.')
 #it builds xgboost code on the fly and packs for pip
 #please don't use this file for installing from github
 
-if not os.name == 'nt': #if not windows, compile and install
+if os.name != 'nt': #if not windows, compile and install
     os.system('sh ./xgboost/build-python.sh')
 else:
     print('Windows users please use github installation.')
@@ -34,7 +34,7 @@ LIB_PATH = libpath['find_lib_path']()
 #and be sure to test it firstly using "python setup.py register sdist upload -r pypitest"
 setup(name='xgboost',
       #version=open(os.path.join(CURRENT_DIR, 'xgboost/VERSION')).read().strip(),
-      version='0.4a28',
+      version='0.4a30',
       description=open(os.path.join(CURRENT_DIR, 'README.rst')).read(),
       install_requires=[
           'numpy',
