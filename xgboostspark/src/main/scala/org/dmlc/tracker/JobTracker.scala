@@ -32,7 +32,10 @@ private[dmlc] class JobTracker(conf: Config) {
     new ProcessBuilder(commandSeq: _*)
   }
 
-  def startRabitTracker(rabitTaskString: String): Boolean = {
+  /**
+    * start tracker in driver side and
+    */
+  private def startRabitTracker(rabitTaskString: String): Boolean = {
     //TODO: start the rabit tracker
     val rabitTracker = buildProcess(s"$trackerScriptPath/$trackerScriptName -n $numSlaves $rabitTaskString").start()
     // Redirect its stdout and stderr to files
@@ -50,7 +53,14 @@ private[dmlc] class JobTracker(conf: Config) {
     * submit the spark job wrapping xgboost
     */
   def run(rabitTaskString: String): Boolean = {
-    startRabitTracker(rabitTaskString)
+    val rabitTrackerThread = new Thread(new Runnable {
+      override def run(): Unit = {
+        startRabitTracker(rabitTaskString)
+      }
+    })
+    rabitTrackerThread.start()
+    //TODO: run rabit task via spark
+    true
   }
 
   //configure
