@@ -15,7 +15,9 @@ object XGBoostExample {
     val paramMaps = new HashMap[String, String]
     val booster = XGBoost(paramMaps)
     booster.getWeights()
-    val jt = new JobTracker(ConfigFactory.parseFile(new File(args(0))))
-    jt.run("rabit_basic.py")
+    val configPath = args(0)
+    val rabitTaskStr = args(1)
+    val jt = new JobTracker(ConfigFactory.parseFile(new File(configPath)))
+    jt.run(rabitTaskStr)
   }
 }
