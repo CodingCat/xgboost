@@ -3,6 +3,7 @@ package org.dmlc.examples
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
+import org.apache.spark.SparkContext
 import org.dmlc.XGBoost
 import org.dmlc.tracker.JobTracker
 
@@ -18,6 +19,8 @@ object XGBoostExample {
     val configPath = args(0)
     val rabitTaskStr = args(1)
     val jt = new JobTracker(ConfigFactory.parseFile(new File(configPath)))
-    jt.run(rabitTaskStr)
+    val sc = new SparkContext()
+    val dataRDD = sc.parallelize(List(1, 2, 3, 4), numSlices = 4)
+    jt.run(dataRDD, rabitTaskStr)
   }
 }
