@@ -10,29 +10,31 @@ import org.dmlc.tracker.utils.FileAppender
 
 private[dmlc] class JobTracker(conf: Config) {
 
-  /**
-    * this function is to be executed by the distributed tasks
-    * note: we have to block the thread here so that we need to ensure that all distributed trees are running
-    * simultaneously
-    */
-  private def executionFunc[T](rddPartition: Iterator[T]): Unit = {
-    // block the thread until all workers are available
-    // NOTE: use actorSystem for now, for Spark 1.6+, we need to use RpcEndpoint since Akka was removed from Spark
-    val system = SparkEnv.get.actorSystem
-    val taskProxyActor = system.actorOf(Props(new TaskProxy()))
-    system.awaitTermination()
+  private def runTrainingTask[T](dataRDD: RDD[T], jobTrackerAddr: String): Unit = {
+    /**
+      * this function is to be executed by the distributed tasks
+      * note: we have to block the thread here so that we need to ensure all distributed trees running simultaneously
+      */
+    def executionFunc(rddPartition: Iterator[T]): Unit = {
+      // block the thread until all workers are available
+      // NOTE: use actorSystem for now, for Spark 1.6+, we need to use RpcEndpoint since Akka was removed from Spark
+      val system = SparkEnv.get.actorSystem
+      val taskProxyActor = system.actorOf(Props(new TaskProxy(jobTrackerAddr)))
+      system.awaitTermination()
+    }
+
+    dataRDD.sparkContext.runJob(dataRDD, executionFunc _)
+    SparkEnv.get.actorSystem.awaitTermination()
   }
 
   /**
     * submit the spark job wrapping xgboost
     */
-  def run[T](dataRDD: RDD[T], rabitTaskString: String): Boolean = {
+  def run[T](dataRDD: RDD[T], rabitTaskString: String): Unit = {
     //start JobTracker actor
-    SparkEnv.get.actorSystem.actorOf(Props(new JobTrackerActor(conf)))
+    val jtAddress = SparkEnv.get.actorSystem.actorOf(Props(new JobTrackerActor(conf)))
     //start tasks
-    dataRDD.sparkContext.runJob(dataRDD, executionFunc _)
-    SparkEnv.get.actorSystem.awaitTermination()
-    true
+    runTrainingTask(dataRDD, jtAddress.path.toString)
   }
 
 }

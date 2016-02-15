@@ -11,14 +11,14 @@ scalaVersion := "2.10.5"
 
 test in assembly :={}
 
-scalacOptions ++= Seq("-unchecked", "-Xlint", "-deprecation", "-Yno-adapted-args", "-feature", "-Xfatal-warnings")
+scalacOptions ++= Seq("-unchecked", "-Xlint", "-deprecation", "-Yno-adapted-args", "-feature")
 
 fork := true
 
 resolvers += "sonatype-releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" % "spark-mllib_2.10" % "1.5.1",
+  "org.apache.spark" % "spark-mllib_2.10" % "1.6.0",
   "com.typesafe" % "config" % "1.2.1",
   "org.scalanlp" %% "breeze" % "0.11.1",
   "junit" % "junit" % "4.11",

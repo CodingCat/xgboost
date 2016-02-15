@@ -1,9 +1,10 @@
 #include "xgboostspark.h"
 
 //XGBoost Header Files
-#include "./learner/learner-inl.hpp" 
+#include "learner.h"
+#include "c_api.h" 
 struct xgboost_state {
-	xgboost::learner::BoostLearner* boost_learner;
+	xgboost::Learner* boost_learner;
 };
 
 struct xgboost_state global_xgboost_state;
