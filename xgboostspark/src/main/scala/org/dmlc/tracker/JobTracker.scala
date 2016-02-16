@@ -17,7 +17,8 @@ private[dmlc] class JobTracker(conf: Config) {
       */
     def executionFunc(rddPartition: Iterator[T]): Unit = {
       // block the thread until all workers are available
-      // NOTE: use actorSystem for now, for Spark 1.6+, we need to use RpcEndpoint since Akka was removed from Spark
+      // TODO: while we use actorSystem for now, for Spark 1.6+, we need to use RpcEndpoint since Akka was removed
+      // from Spark
       val system = SparkEnv.get.actorSystem
       val taskProxyActor = system.actorOf(Props(new TaskProxy(jobTrackerAddr)))
       system.awaitTermination()

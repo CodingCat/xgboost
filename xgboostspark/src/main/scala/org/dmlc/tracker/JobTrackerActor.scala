@@ -15,7 +15,6 @@ class JobTrackerActor(conf: Config) extends Actor {
   private val registeredSlaves = new mutable.HashSet[Int]
 
   private var trackerScriptPath = ""
-  private var trackerScriptName = ""
 
   private var stdoutAppender: FileAppender = null
   private var stderrAppender: FileAppender = null
@@ -30,7 +29,6 @@ class JobTrackerActor(conf: Config) extends Actor {
     verbose = conf.getBoolean("xgboostspark.distributed.tracker.verbose")
     hostIP = conf.getString("xgboostspark.distributed.tracker.ip")
     trackerScriptPath = conf.getString("xgboostspark.distributed.tracker.path")
-    trackerScriptName = conf.getString("xgboostspark.distributed.tracker.scriptname")
     numSlaves = conf.getInt("xgboostspark.distributed.tracker.numSlaves")
   }
 
@@ -44,7 +42,7 @@ class JobTrackerActor(conf: Config) extends Actor {
     */
   private def startRabitTracker(): Boolean = {
     //TODO: start the rabit tracker
-    val rabitTracker = buildProcess(s"$trackerScriptPath/$trackerScriptName -n $numSlaves").start()
+    val rabitTracker = buildProcess(s"$trackerScriptPath -n $numSlaves").start()
     // Redirect its stdout and stderr to files
     val stdout = new File("./", "stdout")
     stdoutAppender = utils.FileAppender(rabitTracker.getInputStream, stdout)
@@ -59,12 +57,13 @@ class JobTrackerActor(conf: Config) extends Actor {
   private def checkTrackerHasStarted(): Boolean = {
     //TODO: we have a fixed length of sleeping interval for now, because we directly run tracker as the external script
     //an ideal way to do this is to implement tracker as well as rabit proxy  in scala
-    Thread.sleep(100000)
+    Thread.sleep(30000)
     true
   }
 
   private def startXGBoost(): Unit = {
     //TODO: start XGBoost
+    //note: we have to start in a separate thread as rabit tracker will block the thread
     val rabitTrackerThread = new Thread(new Runnable {
       override def run(): Unit = {
         startRabitTracker()
