@@ -15,7 +15,7 @@ private[dmlc] class JobTracker(conf: Config) {
   private def initSparkContext(): Unit = {
     val sparkConf = new SparkConf()
     //we prefer the configuration with one task per executor
-    sparkConf.set("spark.task.cpus", conf.getInt("spark.tasks.cpus").toString)
+    sparkConf.set("spark.task.cpus", conf.getInt("spark.task.cpus").toString)
     sparkConf.set("spark.executor.cores", conf.getInt("spark.executor.cores").toString)
     sc = new SparkContext(sparkConf)
   }
