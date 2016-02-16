@@ -19,8 +19,7 @@ object XGBoostExample {
     val configPath = args(0)
     val rabitTaskStr = args(1)
     val jt = new JobTracker(ConfigFactory.parseFile(new File(configPath)))
-    val sc = new SparkContext()
-    val dataRDD = sc.parallelize(List(1, 2, 3, 4), numSlices = 4)
+    val dataRDD = jt.sc.parallelize(List(1, 2, 3, 4), numSlices = 4)
     jt.run(dataRDD, rabitTaskStr)
   }
 }

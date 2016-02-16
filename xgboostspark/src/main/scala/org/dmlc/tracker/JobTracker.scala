@@ -4,11 +4,21 @@ import java.io.File
 
 import akka.actor.Props
 import com.typesafe.config.Config
-import org.apache.spark.{SparkEnv, SparkContext}
+import org.apache.spark.{SparkConf, SparkEnv, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.dmlc.tracker.utils.FileAppender
 
 private[dmlc] class JobTracker(conf: Config) {
+
+  var sc: SparkContext = null
+
+  private def initSparkContext(): Unit = {
+    val sparkConf = new SparkConf()
+    //we prefer the configuration with one task per executor
+    sparkConf.set("spark.task.cpus", conf.getInt("spark.tasks.cpus").toString)
+    sparkConf.set("spark.executor.cores", conf.getInt("spark.executor.cores").toString)
+    sc = new SparkContext(sparkConf)
+  }
 
   private def runTrainingTask[T](dataRDD: RDD[T], jobTrackerAddr: String): Unit = {
     /**
@@ -38,4 +48,5 @@ private[dmlc] class JobTracker(conf: Config) {
     runTrainingTask(dataRDD, jtAddress.path.toString)
   }
 
+  initSparkContext()
 }
