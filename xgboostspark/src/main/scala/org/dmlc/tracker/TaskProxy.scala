@@ -1,9 +1,9 @@
 package org.dmlc.tracker
 
-import akka.actor.{ActorSelection, Actor}
+import akka.actor.{ActorRef, ActorSelection, Actor}
 import akka.actor.Actor.Receive
 
-class TaskProxy(jobTrackerAddress: String) extends Actor {
+class TaskProxy(jobTrackerAddress: String) extends Actor with Specializable {
 
   var jobTrackerHandler: ActorSelection = null
 
