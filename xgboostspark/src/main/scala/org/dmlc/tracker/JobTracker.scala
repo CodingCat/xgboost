@@ -4,11 +4,11 @@ import java.io.File
 
 import akka.actor.Props
 import com.typesafe.config.Config
-import org.apache.spark.{SparkConf, SparkEnv, SparkContext}
+import org.apache.spark.{Logging, SparkConf, SparkEnv, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.dmlc.tracker.utils.FileAppender
 
-private[dmlc] class JobTracker(conf: Config) extends Serializable {
+private[dmlc] class JobTracker(conf: Config) extends Serializable with Logging {
 
   @transient var sc: SparkContext = null
 
@@ -44,6 +44,7 @@ private[dmlc] class JobTracker(conf: Config) extends Serializable {
   def run[T](dataRDD: RDD[T], rabitTaskString: String): Unit = {
     //start JobTracker actor
     val jtAddress = SparkEnv.get.actorSystem.actorOf(Props(new JobTrackerActor(conf)))
+    logInfo(s"started JobTracker at $jtAddress")
     //start tasks
     runTrainingTask(dataRDD, jtAddress.path.toString)
   }
