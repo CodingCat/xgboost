@@ -8,9 +8,9 @@ import org.apache.spark.{SparkConf, SparkEnv, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.dmlc.tracker.utils.FileAppender
 
-private[dmlc] class JobTracker(conf: Config) {
+private[dmlc] class JobTracker(conf: Config) extends Serializable {
 
-  var sc: SparkContext = null
+  @transient var sc: SparkContext = null
 
   private def initSparkContext(): Unit = {
     val sparkConf = new SparkConf()
