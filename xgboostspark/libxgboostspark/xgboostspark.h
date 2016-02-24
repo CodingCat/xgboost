@@ -9,7 +9,6 @@ extern "C" {
 	void destroy_xgboost();
 
 	int set_data_callback(java_callback_t callback);
-	int set_data_callback(java_callback_t callback);
 
 	int set_param(const char* param_name, const char* param_value);
 	

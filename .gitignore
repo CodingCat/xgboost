@@ -77,3 +77,4 @@ build_plugin
 .idea_modules
 target
 *.iml
+*.swp
