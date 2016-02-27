@@ -11,6 +11,39 @@ from .compat import (SKLEARN_INSTALLED, XGBModelBase,
                      XGBClassifierBase, XGBRegressorBase, LabelEncoder)
 
 
+def _objective_decorator(func):
+    """Decorate an objective function
+
+    Converts an objective function using the typical sklearn metrics
+    signature so that it is usable with ``xgboost.training.train``
+
+    Parameters
+    ----------
+    func: callable
+        Expects a callable with signature ``func(y_true, y_pred)``:
+
+        y_true: array_like of shape [n_samples]
+            The target values
+        y_pred: array_like of shape [n_samples]
+            The predicted values
+
+    Returns
+    -------
+    new_func: callable
+        The new objective function as expected by ``xgboost.training.train``.
+        The signature is ``new_func(preds, dmatrix)``:
+
+        preds: array_like, shape [n_samples]
+            The predicted values
+        dmatrix: ``DMatrix``
+            The training set from which the labels will be extracted using
+            ``dmatrix.get_label()``
+    """
+    def inner(preds, dmatrix):
+        labels = dmatrix.get_label()
+        return func(labels, preds)
+    return inner
+
 class XGBModel(XGBModelBase):
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
     """Implementation of the Scikit-Learn API for XGBoost.
@@ -25,9 +58,9 @@ class XGBModel(XGBModelBase):
         Number of boosted trees to fit.
     silent : boolean
         Whether to print messages while running boosting.
-    objective : string
-        Specify the learning task and the corresponding learning objective.
-
+    objective : string or callable
+        Specify the learning task and the corresponding learning objective or
+        a custom objective function to be used (see note below).
     nthread : int
         Number of parallel threads used to run xgboost.
     gamma : float
@@ -56,6 +89,22 @@ class XGBModel(XGBModelBase):
     missing : float, optional
         Value in the data which needs to be present as a missing value. If
         None, defaults to np.nan.
+
+    Note
+    ----
+    A custom objective function can be provided for the ``objective``
+    parameter. In this case, it should have the signature
+    ``objective(y_true, y_pred) -> grad, hess``:
+
+    y_true: array_like of shape [n_samples]
+        The target values
+    y_pred: array_like of shape [n_samples]
+        The predicted values
+
+    grad: array_like of shape [n_samples]
+        The value of the gradient for each sample point.
+    hess: array_like of shape [n_samples]
+        The value of the second derivative for each sample point
     """
     def __init__(self, max_depth=3, learning_rate=0.1, n_estimators=100,
                  silent=True, objective="reg:linear",
@@ -157,7 +206,10 @@ class XGBModel(XGBModelBase):
             Requires at least one item in evals.  If there's more than one,
             will use the last. Returns the model from the last iteration
             (not the best one). If early stopping occurs, the model will
-            have two additional fields: bst.best_score and bst.best_iteration.
+            have three additional fields: bst.best_score, bst.best_iteration
+            and bst.best_ntree_limit.
+            (Use bst.best_ntree_limit to get the correct value if num_parallel_tree
+            and/or num_class appears in the parameters)
         verbose : bool
             If `verbose` and an evaluation set is used, writes the evaluation
             metric measured on the validation set to stderr.
@@ -174,6 +226,12 @@ class XGBModel(XGBModelBase):
 
         params = self.get_xgb_params()
 
+        if callable(self.objective):
+            obj = _objective_decorator(self.objective)
+            params["objective"] = "reg:linear"
+        else:
+            obj = None
+
         feval = eval_metric if callable(eval_metric) else None
         if eval_metric is not None:
             if callable(eval_metric):
@@ -184,7 +242,7 @@ class XGBModel(XGBModelBase):
         self._Booster = train(params, trainDmatrix,
                               self.n_estimators, evals=evals,
                               early_stopping_rounds=early_stopping_rounds,
-                              evals_result=evals_result, feval=feval,
+                              evals_result=evals_result, obj=obj, feval=feval,
                               verbose_eval=verbose)
 
         if evals_result:
@@ -196,6 +254,7 @@ class XGBModel(XGBModelBase):
         if early_stopping_rounds is not None:
             self.best_score = self._Booster.best_score
             self.best_iteration = self._Booster.best_iteration
+            self.best_ntree_limit = self._Booster.best_ntree_limit
         return self
 
     def predict(self, data, output_margin=False, ntree_limit=0):
@@ -294,7 +353,10 @@ class XGBClassifier(XGBModel, XGBClassifierBase):
             Requires at least one item in evals.  If there's more than one,
             will use the last. Returns the model from the last iteration
             (not the best one). If early stopping occurs, the model will
-            have two additional fields: bst.best_score and bst.best_iteration.
+            have three additional fields: bst.best_score, bst.best_iteration
+            and bst.best_ntree_limit.
+            (Use bst.best_ntree_limit to get the correct value if num_parallel_tree
+            and/or num_class appears in the parameters)
         verbose : bool
             If `verbose` and an evaluation set is used, writes the evaluation
             metric measured on the validation set to stderr.
@@ -302,13 +364,21 @@ class XGBClassifier(XGBModel, XGBClassifierBase):
         evals_result = {}
         self.classes_ = list(np.unique(y))
         self.n_classes_ = len(self.classes_)
+
+
+        xgb_options = self.get_xgb_params()
+
+        if callable(self.objective):
+            obj = _objective_decorator(self.objective)
+            # Use default value. Is it really not used ?
+            xgb_options["objective"] = "binary:logistic"
+        else:
+            obj = None
+
         if self.n_classes_ > 2:
             # Switch to using a multiclass objective in the underlying XGB instance
-            self.objective = "multi:softprob"
-            xgb_options = self.get_xgb_params()
+            xgb_options["objective"] = "multi:softprob"
             xgb_options['num_class'] = self.n_classes_
-        else:
-            xgb_options = self.get_xgb_params()
 
         feval = eval_metric if callable(eval_metric) else None
         if eval_metric is not None:
@@ -326,6 +396,8 @@ class XGBClassifier(XGBModel, XGBClassifierBase):
         else:
             evals = ()
 
+        self._features_count = X.shape[1]
+
         self._le = LabelEncoder().fit(y)
         training_labels = self._le.transform(y)
 
@@ -339,7 +411,7 @@ class XGBClassifier(XGBModel, XGBClassifierBase):
         self._Booster = train(xgb_options, train_dmatrix, self.n_estimators,
                               evals=evals,
                               early_stopping_rounds=early_stopping_rounds,
-                              evals_result=evals_result, feval=feval,
+                              evals_result=evals_result, obj=obj, feval=feval,
                               verbose_eval=verbose)
 
         if evals_result:
@@ -351,6 +423,7 @@ class XGBClassifier(XGBModel, XGBClassifierBase):
         if early_stopping_rounds is not None:
             self.best_score = self._Booster.best_score
             self.best_iteration = self._Booster.best_iteration
+            self.best_ntree_limit = self._Booster.best_ntree_limit
 
         return self
 
@@ -413,6 +486,22 @@ class XGBClassifier(XGBModel, XGBClassifierBase):
             raise XGBoostError('No results.')
 
         return evals_result
+
+    @property
+    def feature_importances_(self):
+        """
+        Returns
+        -------
+        feature_importances_ : array of shape = [n_features]
+
+        """
+        fs = self.booster().get_fscore()
+        keys = [int(k.replace('f', '')) for k in fs.keys()]
+        fs_dict = dict(zip(keys, fs.values()))
+        all_features_dict = dict.fromkeys(range(0, self._features_count), 0)
+        all_features_dict.update(fs_dict)
+        return np.array(all_features_dict.values())
+
 
 class XGBRegressor(XGBModel, XGBRegressorBase):
     # pylint: disable=missing-docstring
