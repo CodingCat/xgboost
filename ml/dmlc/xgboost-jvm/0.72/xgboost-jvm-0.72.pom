@@ -56,7 +56,7 @@
                             <outputDirectory>${project.build.directory}/mvn-repo</outputDirectory>
                             <branch>refs/heads/maven-repo</branch>
                             <include>**/*</include>
-                            <excludes>*-with-dependencies*</excludes>
+                            <excludes>*-with-dependencies.jar</excludes>
                             <repositoryName>xgboost</repositoryName>
                             <repositoryOwner>CodingCat</repositoryOwner>
                             <merge>true</merge>
