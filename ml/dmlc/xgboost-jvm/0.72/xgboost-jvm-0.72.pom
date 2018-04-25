@@ -55,8 +55,10 @@
                             <noJekyll>true</noJekyll>
                             <outputDirectory>${project.build.directory}/mvn-repo</outputDirectory>
                             <branch>refs/heads/maven-repo</branch>
-                            <include>**/*</include>
-                            <excludes>*-with-dependencies.jar</excludes>
+                            <includes><include>**/*</include></includes>
+                            <excludes>
+                                <exclude>*-with-dependencies.jar</exclude>
+                            </excludes>
                             <repositoryName>xgboost</repositoryName>
                             <repositoryOwner>CodingCat</repositoryOwner>
                             <merge>true</merge>
