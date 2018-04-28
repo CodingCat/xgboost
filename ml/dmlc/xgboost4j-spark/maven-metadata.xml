@@ -3,10 +3,9 @@
   <groupId>ml.dmlc</groupId>
   <artifactId>xgboost4j-spark</artifactId>
   <versioning>
-    <release>0.72</release>
     <versions>
-      <version>0.72</version>
+      <version>0.72-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20180426025911</lastUpdated>
+    <lastUpdated>20180428143708</lastUpdated>
   </versioning>
 </metadata>
