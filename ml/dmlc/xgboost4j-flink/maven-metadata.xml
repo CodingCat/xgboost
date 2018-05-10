@@ -4,8 +4,8 @@
   <artifactId>xgboost4j-flink</artifactId>
   <versioning>
     <versions>
-      <version>0.72-SNAPSHOT</version>
+      <version>0.72.1-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20180428143805</lastUpdated>
+    <lastUpdated>20180510034033</lastUpdated>
   </versioning>
 </metadata>
