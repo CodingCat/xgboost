@@ -126,6 +126,7 @@ class HistMaker: public BaseMaker {
                       DMatrix *p_fmat,
                       RegTree *p_tree) {
     this->InitData(gpair, *p_fmat, *p_tree);
+    // Nan: initialize the set of working features the size of which should be the number of features
     this->InitWorkSet(p_fmat, *p_tree, &fwork_set_);
     // mark root node as fresh.
     for (int i = 0; i < p_tree->param.num_roots; ++i) {
@@ -162,6 +163,7 @@ class HistMaker: public BaseMaker {
                            const RegTree &tree,
                            std::vector<bst_uint> *p_fset) {
     p_fset->resize(tree.param.num_feature);
+    // Nan: init value should be that the ith feature is in the ith slot of working set
     for (size_t i = 0; i < p_fset->size(); ++i) {
       (*p_fset)[i] = static_cast<unsigned>(i);
     }
@@ -388,6 +390,7 @@ class CQHistMaker: public HistMaker<TStats> {
                           const RegTree &tree) override {
     const MetaInfo &info = p_fmat->Info();
     // fill in reverse map
+    //
     feat2workindex_.resize(tree.param.num_feature);
     std::fill(feat2workindex_.begin(), feat2workindex_.end(), -1);
     work_set_.clear();
@@ -400,8 +403,9 @@ class CQHistMaker: public HistMaker<TStats> {
       }
     }
     const size_t work_set_size = work_set_.size();
-
+    // Nan: resize sketch to be # of numbers * feature number
     sketchs_.resize(this->qexpand_.size() * work_set_size);
+    // Nan: specify the maximum number of elements in the sketch
     for (size_t i = 0; i < sketchs_.size(); ++i) {
       sketchs_[i].Init(info.num_row_, this->param_.sketch_eps);
     }
@@ -410,6 +414,7 @@ class CQHistMaker: public HistMaker<TStats> {
     // setup maximum size
     unsigned max_size = this->param_.MaxSketchSize();
     for (size_t i = 0; i < sketchs_.size(); ++i) {
+      // Nan: summary_arry to be synced
       summary_array_[i].Reserve(max_size);
     }
     {
