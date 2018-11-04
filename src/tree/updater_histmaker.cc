@@ -403,13 +403,15 @@ class CQHistMaker: public HistMaker<TStats> {
       }
     }
     const size_t work_set_size = work_set_.size();
-    // Nan: resize sketch to be # of numbers * feature number
+    // Nan: resize sketch to be # of nodes * feature number
     sketchs_.resize(this->qexpand_.size() * work_set_size);
     // Nan: specify the maximum number of elements in the sketch
     for (size_t i = 0; i < sketchs_.size(); ++i) {
       sketchs_[i].Init(info.num_row_, this->param_.sketch_eps);
     }
     // intitialize the summary array
+    // Nan: summary_array_ is the data structure storing the data distribution of each node (represented)
+    // as the sketch
     summary_array_.resize(sketchs_.size());
     // setup maximum size
     unsigned max_size = this->param_.MaxSketchSize();
