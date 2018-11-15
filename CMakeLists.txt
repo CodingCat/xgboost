@@ -1,264 +1,714 @@
-cmake_minimum_required (VERSION 3.2)
+cmake_minimum_required(VERSION 3.10)
+
+set(CMAKE_C_COMPILER "/Users/nanzhu/code/clang-5.0.1/bin/clang")
+set(CMAKE_CXX_COMPILER "/Users/nanzhu/code/clang-5.0.1/bin/clang++")
+
 project(xgboost)
-include(cmake/Utils.cmake)
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
-find_package(OpenMP)
 
-set_default_configuration_release()
-msvc_use_static_runtime()
-
-# Options
-option(USE_CUDA  "Build with GPU acceleration")
-option(JVM_BINDINGS "Build JVM bindings" OFF)
-option(GOOGLE_TEST "Build google tests" OFF)
-option(R_LIB "Build shared library for R package" OFF)
-set(GPU_COMPUTE_VER "" CACHE STRING
-  "Space separated list of compute versions to be built against, e.g. '35 61'")
-option(USE_SANITIZER "Use santizer flags" OFF)
-option(SANITIZER_PATH "Path to sanitizes.")
-set(ENABLED_SANITIZERS "address" "leak" CACHE STRING
-  "Semicolon separated list of sanitizer names. E.g 'address;leak'. Supported sanitizers are
-address, leak and thread.")
-
-# Plugins
-option(PLUGIN_LZ4 "Build lz4 plugin" OFF)
-option(PLUGIN_DENSE_PARSER "Build dense parser plugin" OFF)
-
-# Deprecation warning
-if(USE_AVX)
-  message(WARNING "The option 'USE_AVX' is deprecated as experimental AVX features have been removed from xgboost.")
-endif()
-
-# Compiler flags
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if(OpenMP_CXX_FOUND OR OPENMP_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-endif()
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-if(MSVC)
-  # Multithreaded compilation
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-else()
-  # Correct error for GCC 5 and cuda
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES")
-  # Performance
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops")
-endif()
-if(WIN32 AND MINGW)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++")
-endif()
 
-# Sanitizer
-if(USE_SANITIZER)
-  include(cmake/Sanitizer.cmake)
-  enable_sanitizers("${ENABLED_SANITIZERS}")
-endif(USE_SANITIZER)
+include_directories(cub/experimental)
+include_directories(cub/experimental/histogram)
+include_directories(cub/test)
+include_directories(dmlc-core/include)
+include_directories(dmlc-core/include/dmlc)
+include_directories(dmlc-core/src/data)
+include_directories(dmlc-core/src/io)
+include_directories(include)
+include_directories(jvm-packages/xgboost4j/src/native)
+include_directories(nccl/src)
+include_directories(nccl/test/include)
+include_directories(R-package/src)
+include_directories(rabit/include)
+include_directories(rabit/include/dmlc)
+include_directories(rabit/include/rabit)
+include_directories(rabit/include/rabit/internal)
+include_directories(rabit/src)
+include_directories(src/c_api)
+include_directories(src/common)
+include_directories(src/data)
+include_directories(src/gbm)
+include_directories(src/linear)
+include_directories(src/objective)
+include_directories(src/tree)
+include_directories(tests/cpp)
+include_directories(tests/cpp/common)
 
-# dmlc-core
-add_subdirectory(dmlc-core)
-set(LINK_LIBRARIES dmlc rabit)
-
-# enable custom logging
-add_definitions(-DDMLC_LOG_CUSTOMIZE=1)
-
-# compiled code customizations for R package
-if(R_LIB)
-  add_definitions(
-    -DXGBOOST_STRICT_R_MODE=1
-    -DXGBOOST_CUSTOMIZE_GLOBAL_PRNG=1
-    -DDMLC_LOG_BEFORE_THROW=0
-    -DDMLC_DISABLE_STDIN=1
-    -DDMLC_LOG_CUSTOMIZE=1
-    -DRABIT_CUSTOMIZE_MSG_
-    -DRABIT_STRICT_CXX98_
-  )
-endif()
-
-# Gather source files
-include_directories (
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/dmlc-core/include
-    ${PROJECT_SOURCE_DIR}/rabit/include
-)
-
-file(GLOB_RECURSE SOURCES
-    src/*.cc
-    src/*.h
-    include/*.h
-)
-
-# Only add main function for executable target
-list(REMOVE_ITEM SOURCES ${PROJECT_SOURCE_DIR}/src/cli_main.cc)
-
-file(GLOB_RECURSE TEST_SOURCES "tests/cpp/*.cc")
-
-file(GLOB_RECURSE CUDA_SOURCES
-    src/*.cu
-    src/*.cuh
-)
-
-# Add plugins to source files
-if(PLUGIN_LZ4)
-  list(APPEND SOURCES plugin/lz4/sparse_page_lz4_format.cc)
-  link_libraries(lz4)
-endif()
-if(PLUGIN_DENSE_PARSER)
-  list(APPEND SOURCES plugin/dense_parser/dense_libsvm.cc)
-endif()
-
-# rabit
-# TODO: Create rabit cmakelists.txt
-set(RABIT_SOURCES
-    rabit/src/allreduce_base.cc
-    rabit/src/allreduce_robust.cc
-    rabit/src/engine.cc
-    rabit/src/c_api.cc
-)
-set(RABIT_EMPTY_SOURCES
-    rabit/src/engine_empty.cc
-    rabit/src/c_api.cc
-)
-if(MINGW OR R_LIB)
-  # build a dummy rabit library
-  add_library(rabit STATIC ${RABIT_EMPTY_SOURCES})
-else()
-  add_library(rabit STATIC ${RABIT_SOURCES})
-endif()
-
-if(USE_CUDA)
-  find_package(CUDA 8.0 REQUIRED)
-  cmake_minimum_required(VERSION 3.5)
-
-  add_definitions(-DXGBOOST_USE_CUDA)
-
-  include_directories(cub)
-
-  if(USE_NCCL)
-    find_package(Nccl REQUIRED)
-    include_directories(${NCCL_INCLUDE_DIR})
-    add_definitions(-DXGBOOST_USE_NCCL)
-  endif()
-
-  set(GENCODE_FLAGS "")
-  format_gencode_flags("${GPU_COMPUTE_VER}" GENCODE_FLAGS)
-  message("cuda architecture flags: ${GENCODE_FLAGS}")
-
-  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};--expt-extended-lambda;--expt-relaxed-constexpr;${GENCODE_FLAGS};-lineinfo;")
-  if(NOT MSVC)
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-Xcompiler -fPIC; -Xcompiler -Werror; -std=c++11")
-  endif()
-
-  cuda_add_library(gpuxgboost ${CUDA_SOURCES} STATIC)
-
-  if(USE_NCCL)
-    link_directories(${NCCL_LIBRARY})
-    target_link_libraries(gpuxgboost ${NCCL_LIB_NAME})
-  endif()
-  list(APPEND LINK_LIBRARIES gpuxgboost)
-endif()
-
-
-# flags and sources for R-package
-if(R_LIB)
-  file(GLOB_RECURSE R_SOURCES
-    R-package/src/*.h
-    R-package/src/*.c
-    R-package/src/*.cc
-  )
-  list(APPEND SOURCES ${R_SOURCES})
-endif()
-
-add_library(objxgboost OBJECT ${SOURCES})
-
-
-# building shared library for R package
-if(R_LIB)
-  find_package(LibR REQUIRED)
-
-  list(APPEND LINK_LIBRARIES "${LIBR_CORE_LIBRARY}")
-  MESSAGE(STATUS "LIBR_CORE_LIBRARY " ${LIBR_CORE_LIBRARY})
-
-  include_directories(
-    "${LIBR_INCLUDE_DIRS}"
-    "${PROJECT_SOURCE_DIR}"
-  )
-
-  # Shared library target for the R package
-  add_library(xgboost SHARED $<TARGET_OBJECTS:objxgboost>)
-  target_link_libraries(xgboost ${LINK_LIBRARIES})
-  # R uses no lib prefix in shared library names of its packages
-  set_target_properties(xgboost PROPERTIES PREFIX "")
-  if(APPLE)
-    set_target_properties(xgboost PROPERTIES SUFFIX ".so")
-  endif()
-
-  setup_rpackage_install_target(xgboost ${CMAKE_CURRENT_BINARY_DIR})
-  # use a dummy location for any other remaining installs
-  set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/dummy_inst")
-
-# main targets: shared library & exe
-else()
-  # Executable
-  add_executable(runxgboost $<TARGET_OBJECTS:objxgboost> src/cli_main.cc)
-  set_target_properties(runxgboost PROPERTIES
-    OUTPUT_NAME xgboost
-  )
-  set_output_directory(runxgboost ${PROJECT_SOURCE_DIR})
-  target_link_libraries(runxgboost ${LINK_LIBRARIES})
-
-  # Shared library
-  add_library(xgboost SHARED $<TARGET_OBJECTS:objxgboost>)
-  target_link_libraries(xgboost ${LINK_LIBRARIES})
-  set_output_directory(xgboost ${PROJECT_SOURCE_DIR}/lib)
-  if(MINGW)
-    # remove the 'lib' prefix to conform to windows convention for shared library names
-    set_target_properties(xgboost PROPERTIES PREFIX "")
-  endif()
-
-  #Ensure these two targets do not build simultaneously, as they produce outputs with conflicting names
-  add_dependencies(xgboost runxgboost)
-endif()
-
-
-# JVM
-if(JVM_BINDINGS)
-    find_package(JNI QUIET REQUIRED)
-
-    include_directories(${JNI_INCLUDE_DIRS} jvm-packages/xgboost4j/src/native)
-
-    add_library(xgboost4j SHARED
-        $<TARGET_OBJECTS:objxgboost>
-        jvm-packages/xgboost4j/src/native/xgboost4j.cpp)
-    set_output_directory(xgboost4j ${PROJECT_SOURCE_DIR}/lib)
-    target_link_libraries(xgboost4j
-        ${LINK_LIBRARIES}
-        ${JAVA_JVM_LIBRARY})
-endif()
-
-
-# Test
-if(GOOGLE_TEST)
-  enable_testing()
-  find_package(GTest REQUIRED)
-
-  auto_source_group("${TEST_SOURCES}")
-  include_directories(${GTEST_INCLUDE_DIRS})
-
-  if(USE_CUDA)
-    file(GLOB_RECURSE CUDA_TEST_SOURCES "tests/cpp/*.cu")
-    cuda_compile(CUDA_TEST_OBJS ${CUDA_TEST_SOURCES})
-  else()
-    set(CUDA_TEST_OBJS "")
-  endif()
-
-  add_executable(testxgboost ${TEST_SOURCES} ${CUDA_TEST_OBJS} $<TARGET_OBJECTS:objxgboost>)
-  set_output_directory(testxgboost ${PROJECT_SOURCE_DIR})
-  target_link_libraries(testxgboost ${GTEST_LIBRARIES} ${LINK_LIBRARIES})
-
-  add_test(TestXGBoost testxgboost)
-endif()
-
-
-# Group sources
-auto_source_group("${SOURCES}")
+add_executable(xgboost
+        cub/cub/agent/agent_histogram.cuh
+        cub/cub/agent/agent_radix_sort_downsweep.cuh
+        cub/cub/agent/agent_radix_sort_upsweep.cuh
+        cub/cub/agent/agent_reduce.cuh
+        cub/cub/agent/agent_reduce_by_key.cuh
+        cub/cub/agent/agent_rle.cuh
+        cub/cub/agent/agent_scan.cuh
+        cub/cub/agent/agent_segment_fixup.cuh
+        cub/cub/agent/agent_select_if.cuh
+        cub/cub/agent/agent_spmv_csrt.cuh
+        cub/cub/agent/agent_spmv_orig.cuh
+        cub/cub/agent/agent_spmv_row_based.cuh
+        cub/cub/agent/single_pass_scan_operators.cuh
+        cub/cub/block/specializations/block_histogram_atomic.cuh
+        cub/cub/block/specializations/block_histogram_sort.cuh
+        cub/cub/block/specializations/block_reduce_raking.cuh
+        cub/cub/block/specializations/block_reduce_raking_commutative_only.cuh
+        cub/cub/block/specializations/block_reduce_warp_reductions.cuh
+        cub/cub/block/specializations/block_scan_raking.cuh
+        cub/cub/block/specializations/block_scan_warp_scans.cuh
+        cub/cub/block/specializations/block_scan_warp_scans2.cuh
+        cub/cub/block/specializations/block_scan_warp_scans3.cuh
+        cub/cub/block/block_adjacent_difference.cuh
+        cub/cub/block/block_discontinuity.cuh
+        cub/cub/block/block_exchange.cuh
+        cub/cub/block/block_histogram.cuh
+        cub/cub/block/block_load.cuh
+        cub/cub/block/block_radix_rank.cuh
+        cub/cub/block/block_radix_sort.cuh
+        cub/cub/block/block_raking_layout.cuh
+        cub/cub/block/block_reduce.cuh
+        cub/cub/block/block_scan.cuh
+        cub/cub/block/block_shuffle.cuh
+        cub/cub/block/block_store.cuh
+        cub/cub/device/dispatch/dispatch_histogram.cuh
+        cub/cub/device/dispatch/dispatch_radix_sort.cuh
+        cub/cub/device/dispatch/dispatch_reduce.cuh
+        cub/cub/device/dispatch/dispatch_reduce_by_key.cuh
+        cub/cub/device/dispatch/dispatch_rle.cuh
+        cub/cub/device/dispatch/dispatch_scan.cuh
+        cub/cub/device/dispatch/dispatch_select_if.cuh
+        cub/cub/device/dispatch/dispatch_spmv_csrt.cuh
+        cub/cub/device/dispatch/dispatch_spmv_orig.cuh
+        cub/cub/device/dispatch/dispatch_spmv_row_based.cuh
+        cub/cub/device/device_histogram.cuh
+        cub/cub/device/device_partition.cuh
+        cub/cub/device/device_radix_sort.cuh
+        cub/cub/device/device_reduce.cuh
+        cub/cub/device/device_run_length_encode.cuh
+        cub/cub/device/device_scan.cuh
+        cub/cub/device/device_segmented_radix_sort.cuh
+        cub/cub/device/device_segmented_reduce.cuh
+        cub/cub/device/device_select.cuh
+        cub/cub/device/device_spmv.cuh
+        cub/cub/grid/grid_barrier.cuh
+        cub/cub/grid/grid_even_share.cuh
+        cub/cub/grid/grid_mapping.cuh
+        cub/cub/grid/grid_queue.cuh
+        cub/cub/host/mutex.cuh
+        cub/cub/iterator/arg_index_input_iterator.cuh
+        cub/cub/iterator/cache_modified_input_iterator.cuh
+        cub/cub/iterator/cache_modified_output_iterator.cuh
+        cub/cub/iterator/constant_input_iterator.cuh
+        cub/cub/iterator/counting_input_iterator.cuh
+        cub/cub/iterator/discard_output_iterator.cuh
+        cub/cub/iterator/tex_obj_input_iterator.cuh
+        cub/cub/iterator/tex_ref_input_iterator.cuh
+        cub/cub/iterator/transform_input_iterator.cuh
+        cub/cub/thread/thread_load.cuh
+        cub/cub/thread/thread_operators.cuh
+        cub/cub/thread/thread_reduce.cuh
+        cub/cub/thread/thread_scan.cuh
+        cub/cub/thread/thread_search.cuh
+        cub/cub/thread/thread_store.cuh
+        cub/cub/warp/specializations/warp_reduce_shfl.cuh
+        cub/cub/warp/specializations/warp_reduce_smem.cuh
+        cub/cub/warp/specializations/warp_scan_shfl.cuh
+        cub/cub/warp/specializations/warp_scan_smem.cuh
+        cub/cub/warp/warp_reduce.cuh
+        cub/cub/warp/warp_scan.cuh
+        cub/cub/cub.cuh
+        cub/cub/util_allocator.cuh
+        cub/cub/util_arch.cuh
+        cub/cub/util_debug.cuh
+        cub/cub/util_device.cuh
+        cub/cub/util_macro.cuh
+        cub/cub/util_namespace.cuh
+        cub/cub/util_ptx.cuh
+        cub/cub/util_type.cuh
+        cub/examples/block/example_block_radix_sort.cu
+        cub/examples/block/example_block_reduce.cu
+        cub/examples/block/example_block_scan.cu
+        cub/examples/block/Makefile
+        cub/examples/block/reduce_by_key.cu
+        cub/examples/device/example_device_partition_flagged.cu
+        cub/examples/device/example_device_partition_if.cu
+        cub/examples/device/example_device_radix_sort.cu
+        cub/examples/device/example_device_reduce.cu
+        cub/examples/device/example_device_scan.cu
+        cub/examples/device/example_device_select_flagged.cu
+        cub/examples/device/example_device_select_if.cu
+        cub/examples/device/example_device_select_unique.cu
+        cub/examples/device/example_device_sort_find_non_trivial_runs.cu
+        cub/examples/device/Makefile
+        cub/experimental/defunct/example_coo_spmv.cu
+        cub/experimental/defunct/test_device_seg_reduce.cu
+        cub/experimental/histogram/histogram_cub.h
+        cub/experimental/histogram/histogram_gmem_atomics.h
+        cub/experimental/histogram/histogram_smem_atomics.h
+        cub/experimental/histogram_compare.cu
+        cub/experimental/Makefile
+        cub/experimental/sparse_matrix.h
+        cub/experimental/spmv_compare.cu
+        cub/experimental/spmv_script.sh
+        cub/test/link_a.cu
+        cub/test/link_b.cu
+        cub/test/link_main.cpp
+        cub/test/Makefile
+        cub/test/mersenne.h
+        cub/test/test_allocator.cu
+        cub/test/test_block_histogram.cu
+        cub/test/test_block_load_store.cu
+        cub/test/test_block_radix_sort.cu
+        cub/test/test_block_reduce.cu
+        cub/test/test_block_scan.cu
+        cub/test/test_device_histogram.cu
+        cub/test/test_device_radix_sort.cu
+        cub/test/test_device_reduce.cu
+        cub/test/test_device_reduce_by_key.cu
+        cub/test/test_device_run_length_encode.cu
+        cub/test/test_device_scan.cu
+        cub/test/test_device_select_if.cu
+        cub/test/test_device_select_unique.cu
+        cub/test/test_grid_barrier.cu
+        cub/test/test_iterator.cu
+        cub/test/test_util.h
+        cub/test/test_warp_reduce.cu
+        cub/test/test_warp_scan.cu
+        cub/tune/Makefile
+        cub/tune/tune_device_reduce.cu
+        cub/CHANGE_LOG.TXT
+        cub/common.mk
+        "cub/eclipse code style profile.xml"
+        cub/LICENSE.TXT
+        cub/README.md
+        dmlc-core/example/parameter.cc
+        dmlc-core/include/dmlc/any.h
+        dmlc-core/include/dmlc/array_view.h
+        dmlc-core/include/dmlc/base.h
+        dmlc-core/include/dmlc/blockingconcurrentqueue.h
+        dmlc-core/include/dmlc/build_config.h
+        dmlc-core/include/dmlc/common.h
+        dmlc-core/include/dmlc/concurrency.h
+        dmlc-core/include/dmlc/concurrentqueue.h
+        dmlc-core/include/dmlc/config.h
+        dmlc-core/include/dmlc/data.h
+        dmlc-core/include/dmlc/endian.h
+        dmlc-core/include/dmlc/filesystem.h
+        dmlc-core/include/dmlc/input_split_shuffle.h
+        dmlc-core/include/dmlc/io.h
+        dmlc-core/include/dmlc/json.h
+        dmlc-core/include/dmlc/logging.h
+        dmlc-core/include/dmlc/lua.h
+        dmlc-core/include/dmlc/memory.h
+        dmlc-core/include/dmlc/memory_io.h
+        dmlc-core/include/dmlc/omp.h
+        dmlc-core/include/dmlc/optional.h
+        dmlc-core/include/dmlc/parameter.h
+        dmlc-core/include/dmlc/recordio.h
+        dmlc-core/include/dmlc/registry.h
+        dmlc-core/include/dmlc/serializer.h
+        dmlc-core/include/dmlc/thread_group.h
+        dmlc-core/include/dmlc/thread_local.h
+        dmlc-core/include/dmlc/threadediter.h
+        dmlc-core/include/dmlc/timer.h
+        dmlc-core/include/dmlc/type_traits.h
+        dmlc-core/src/data/basic_row_iter.h
+        dmlc-core/src/data/csv_parser.h
+        dmlc-core/src/data/disk_row_iter.h
+        dmlc-core/src/data/libfm_parser.h
+        dmlc-core/src/data/libsvm_parser.h
+        dmlc-core/src/data/parser.h
+        dmlc-core/src/data/row_block.h
+        dmlc-core/src/data/strtonum.h
+        dmlc-core/src/data/text_parser.h
+        dmlc-core/src/io/azure_filesys.cc
+        dmlc-core/src/io/azure_filesys.h
+        dmlc-core/src/io/cached_input_split.h
+        dmlc-core/src/io/filesys.cc
+        dmlc-core/src/io/filesys.h
+        dmlc-core/src/io/hdfs_filesys.cc
+        dmlc-core/src/io/hdfs_filesys.h
+        dmlc-core/src/io/indexed_recordio_split.cc
+        dmlc-core/src/io/indexed_recordio_split.h
+        dmlc-core/src/io/input_split_base.cc
+        dmlc-core/src/io/input_split_base.h
+        dmlc-core/src/io/line_split.cc
+        dmlc-core/src/io/line_split.h
+        dmlc-core/src/io/local_filesys.cc
+        dmlc-core/src/io/local_filesys.h
+        dmlc-core/src/io/recordio_split.cc
+        dmlc-core/src/io/recordio_split.h
+        dmlc-core/src/io/s3_filesys.cc
+        dmlc-core/src/io/s3_filesys.h
+        dmlc-core/src/io/single_file_split.h
+        dmlc-core/src/io/single_threaded_input_split.h
+        dmlc-core/src/io/threaded_input_split.h
+        dmlc-core/src/io/uri_spec.h
+        dmlc-core/src/build_config.cc
+        dmlc-core/src/config.cc
+        dmlc-core/src/data.cc
+        dmlc-core/src/io.cc
+        dmlc-core/src/recordio.cc
+        dmlc-core/test/unittest/unittest_any.cc
+        dmlc-core/test/unittest/unittest_array_view.cc
+        dmlc-core/test/unittest/unittest_config.cc
+        dmlc-core/test/unittest/unittest_env.cc
+        dmlc-core/test/unittest/unittest_inputsplit.cc
+        dmlc-core/test/unittest/unittest_json.cc
+        dmlc-core/test/unittest/unittest_lockfree.cc
+        dmlc-core/test/unittest/unittest_logging.cc
+        dmlc-core/test/unittest/unittest_main.cc
+        dmlc-core/test/unittest/unittest_optional.cc
+        dmlc-core/test/unittest/unittest_param.cc
+        dmlc-core/test/unittest/unittest_parser.cc
+        dmlc-core/test/unittest/unittest_serializer.cc
+        dmlc-core/test/unittest/unittest_tempdir.cc
+        dmlc-core/test/unittest/unittest_thread_group.cc
+        dmlc-core/test/unittest/unittest_threaditer.cc
+        dmlc-core/test/unittest/unittest_threaditer_exc_handling.cc
+        dmlc-core/test/csv_parser_test.cc
+        dmlc-core/test/dataiter_test.cc
+        dmlc-core/test/filesys_test.cc
+        dmlc-core/test/iostream_test.cc
+        dmlc-core/test/libfm_parser_test.cc
+        dmlc-core/test/libsvm_parser_test.cc
+        dmlc-core/test/logging_test.cc
+        dmlc-core/test/parameter_test.cc
+        dmlc-core/test/recordio_test.cc
+        dmlc-core/test/registry_test.cc
+        dmlc-core/test/split_read_test.cc
+        dmlc-core/test/split_repeat_read_test.cc
+        dmlc-core/test/split_test.cc
+        dmlc-core/test/stream_read_test.cc
+        dmlc-core/test/strtonum_test.cc
+        include/xgboost/base.h
+        include/xgboost/c_api.h
+        include/xgboost/data.h
+        include/xgboost/feature_map.h
+        include/xgboost/gbm.h
+        include/xgboost/learner.h
+        include/xgboost/linear_updater.h
+        include/xgboost/logging.h
+        include/xgboost/metric.h
+        include/xgboost/objective.h
+        include/xgboost/predictor.h
+        include/xgboost/tree_model.h
+        include/xgboost/tree_updater.h
+        jvm-packages/xgboost4j/src/native/xgboost4j.cpp
+        jvm-packages/xgboost4j/src/native/xgboost4j.h
+        nccl/debian/source/format
+        nccl/debian/changelog.in
+        nccl/debian/compat
+        nccl/debian/control.in
+        nccl/debian/libnccl-dev.install
+        nccl/debian/libnccl-dev.manpages
+        nccl/debian/libnccl1.install.in
+        nccl/debian/nccl.7
+        nccl/debian/rules
+        nccl/debian/shlibs.local.in
+        nccl/fortran/src/cudafor.f90
+        nccl/fortran/src/ncclfor.f90
+        nccl/fortran/test/allgather_arr_out.f90
+        nccl/fortran/test/allgather_ptr_out.f90
+        nccl/fortran/test/allreduce_arr_out.f90
+        nccl/fortran/test/allreduce_ptr_out.f90
+        nccl/fortran/test/broadcast_arr.f90
+        nccl/fortran/test/broadcast_ptr.f90
+        nccl/fortran/test/reduce_arr_out.f90
+        nccl/fortran/test/reduce_ptr_out.f90
+        nccl/fortran/test/reducescatter_arr_out.f90
+        nccl/fortran/test/reducescatter_ptr_out.f90
+        nccl/fortran/Makefile
+        nccl/src/all_gather.cu
+        nccl/src/all_reduce.cu
+        nccl/src/broadcast.cu
+        nccl/src/common_coll.h
+        nccl/src/common_kernel.h
+        nccl/src/copy_kernel.h
+        nccl/src/core.cu
+        nccl/src/core.h
+        nccl/src/enqueue.h
+        nccl/src/libwrap.cu
+        nccl/src/libwrap.h
+        nccl/src/nccl.h
+        nccl/src/primitives.h
+        nccl/src/reduce.cu
+        nccl/src/reduce_kernel.h
+        nccl/src/reduce_scatter.cu
+        nccl/test/include/test_utilities.h
+        nccl/test/mpi/mpi_test.cu
+        nccl/test/single/all_gather_scan.cu
+        nccl/test/single/all_gather_test.cu
+        nccl/test/single/all_reduce_scan.cu
+        nccl/test/single/all_reduce_test.cu
+        nccl/test/single/broadcast_scan.cu
+        nccl/test/single/broadcast_test.cu
+        nccl/test/single/reduce_scan.cu
+        nccl/test/single/reduce_scatter_scan.cu
+        nccl/test/single/reduce_scatter_test.cu
+        nccl/test/single/reduce_test.cu
+        nccl/CMakeLists.txt
+        nccl/LICENSE.txt
+        nccl/Makefile
+        nccl/README.md
+        plugin/dense_parser/dense_libsvm.cc
+        plugin/example/custom_obj.cc
+        plugin/lz4/sparse_page_lz4_format.cc
+        python-package/xgboost/dmlc-core/example/parameter.cc
+        python-package/xgboost/dmlc-core/include/dmlc/any.h
+        python-package/xgboost/dmlc-core/include/dmlc/array_view.h
+        python-package/xgboost/dmlc-core/include/dmlc/base.h
+        python-package/xgboost/dmlc-core/include/dmlc/blockingconcurrentqueue.h
+        python-package/xgboost/dmlc-core/include/dmlc/build_config.h
+        python-package/xgboost/dmlc-core/include/dmlc/common.h
+        python-package/xgboost/dmlc-core/include/dmlc/concurrency.h
+        python-package/xgboost/dmlc-core/include/dmlc/concurrentqueue.h
+        python-package/xgboost/dmlc-core/include/dmlc/config.h
+        python-package/xgboost/dmlc-core/include/dmlc/data.h
+        python-package/xgboost/dmlc-core/include/dmlc/endian.h
+        python-package/xgboost/dmlc-core/include/dmlc/filesystem.h
+        python-package/xgboost/dmlc-core/include/dmlc/input_split_shuffle.h
+        python-package/xgboost/dmlc-core/include/dmlc/io.h
+        python-package/xgboost/dmlc-core/include/dmlc/json.h
+        python-package/xgboost/dmlc-core/include/dmlc/logging.h
+        python-package/xgboost/dmlc-core/include/dmlc/lua.h
+        python-package/xgboost/dmlc-core/include/dmlc/memory.h
+        python-package/xgboost/dmlc-core/include/dmlc/memory_io.h
+        python-package/xgboost/dmlc-core/include/dmlc/omp.h
+        python-package/xgboost/dmlc-core/include/dmlc/optional.h
+        python-package/xgboost/dmlc-core/include/dmlc/parameter.h
+        python-package/xgboost/dmlc-core/include/dmlc/recordio.h
+        python-package/xgboost/dmlc-core/include/dmlc/registry.h
+        python-package/xgboost/dmlc-core/include/dmlc/serializer.h
+        python-package/xgboost/dmlc-core/include/dmlc/thread_group.h
+        python-package/xgboost/dmlc-core/include/dmlc/thread_local.h
+        python-package/xgboost/dmlc-core/include/dmlc/threadediter.h
+        python-package/xgboost/dmlc-core/include/dmlc/timer.h
+        python-package/xgboost/dmlc-core/include/dmlc/type_traits.h
+        python-package/xgboost/dmlc-core/src/data/basic_row_iter.h
+        python-package/xgboost/dmlc-core/src/data/csv_parser.h
+        python-package/xgboost/dmlc-core/src/data/disk_row_iter.h
+        python-package/xgboost/dmlc-core/src/data/libfm_parser.h
+        python-package/xgboost/dmlc-core/src/data/libsvm_parser.h
+        python-package/xgboost/dmlc-core/src/data/parser.h
+        python-package/xgboost/dmlc-core/src/data/row_block.h
+        python-package/xgboost/dmlc-core/src/data/strtonum.h
+        python-package/xgboost/dmlc-core/src/data/text_parser.h
+        python-package/xgboost/dmlc-core/src/io/azure_filesys.cc
+        python-package/xgboost/dmlc-core/src/io/azure_filesys.h
+        python-package/xgboost/dmlc-core/src/io/cached_input_split.h
+        python-package/xgboost/dmlc-core/src/io/filesys.cc
+        python-package/xgboost/dmlc-core/src/io/filesys.h
+        python-package/xgboost/dmlc-core/src/io/hdfs_filesys.cc
+        python-package/xgboost/dmlc-core/src/io/hdfs_filesys.h
+        python-package/xgboost/dmlc-core/src/io/indexed_recordio_split.cc
+        python-package/xgboost/dmlc-core/src/io/indexed_recordio_split.h
+        python-package/xgboost/dmlc-core/src/io/input_split_base.cc
+        python-package/xgboost/dmlc-core/src/io/input_split_base.h
+        python-package/xgboost/dmlc-core/src/io/line_split.cc
+        python-package/xgboost/dmlc-core/src/io/line_split.h
+        python-package/xgboost/dmlc-core/src/io/local_filesys.cc
+        python-package/xgboost/dmlc-core/src/io/local_filesys.h
+        python-package/xgboost/dmlc-core/src/io/recordio_split.cc
+        python-package/xgboost/dmlc-core/src/io/recordio_split.h
+        python-package/xgboost/dmlc-core/src/io/s3_filesys.cc
+        python-package/xgboost/dmlc-core/src/io/s3_filesys.h
+        python-package/xgboost/dmlc-core/src/io/single_file_split.h
+        python-package/xgboost/dmlc-core/src/io/single_threaded_input_split.h
+        python-package/xgboost/dmlc-core/src/io/threaded_input_split.h
+        python-package/xgboost/dmlc-core/src/io/uri_spec.h
+        python-package/xgboost/dmlc-core/src/build_config.cc
+        python-package/xgboost/dmlc-core/src/config.cc
+        python-package/xgboost/dmlc-core/src/data.cc
+        python-package/xgboost/dmlc-core/src/io.cc
+        python-package/xgboost/dmlc-core/src/recordio.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_any.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_array_view.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_config.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_env.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_inputsplit.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_json.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_lockfree.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_logging.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_main.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_optional.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_param.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_parser.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_serializer.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_tempdir.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_thread_group.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_threaditer.cc
+        python-package/xgboost/dmlc-core/test/unittest/unittest_threaditer_exc_handling.cc
+        python-package/xgboost/dmlc-core/test/csv_parser_test.cc
+        python-package/xgboost/dmlc-core/test/dataiter_test.cc
+        python-package/xgboost/dmlc-core/test/filesys_test.cc
+        python-package/xgboost/dmlc-core/test/iostream_test.cc
+        python-package/xgboost/dmlc-core/test/libfm_parser_test.cc
+        python-package/xgboost/dmlc-core/test/libsvm_parser_test.cc
+        python-package/xgboost/dmlc-core/test/logging_test.cc
+        python-package/xgboost/dmlc-core/test/parameter_test.cc
+        python-package/xgboost/dmlc-core/test/recordio_test.cc
+        python-package/xgboost/dmlc-core/test/registry_test.cc
+        python-package/xgboost/dmlc-core/test/split_read_test.cc
+        python-package/xgboost/dmlc-core/test/split_repeat_read_test.cc
+        python-package/xgboost/dmlc-core/test/split_test.cc
+        python-package/xgboost/dmlc-core/test/stream_read_test.cc
+        python-package/xgboost/dmlc-core/test/strtonum_test.cc
+        python-package/xgboost/include/xgboost/base.h
+        python-package/xgboost/include/xgboost/c_api.h
+        python-package/xgboost/include/xgboost/data.h
+        python-package/xgboost/include/xgboost/feature_map.h
+        python-package/xgboost/include/xgboost/gbm.h
+        python-package/xgboost/include/xgboost/learner.h
+        python-package/xgboost/include/xgboost/linear_updater.h
+        python-package/xgboost/include/xgboost/logging.h
+        python-package/xgboost/include/xgboost/metric.h
+        python-package/xgboost/include/xgboost/objective.h
+        python-package/xgboost/include/xgboost/predictor.h
+        python-package/xgboost/include/xgboost/tree_model.h
+        python-package/xgboost/include/xgboost/tree_updater.h
+        python-package/xgboost/rabit/guide/basic.cc
+        python-package/xgboost/rabit/guide/broadcast.cc
+        python-package/xgboost/rabit/guide/lazy_allreduce.cc
+        python-package/xgboost/rabit/include/dmlc/base.h
+        python-package/xgboost/rabit/include/dmlc/io.h
+        python-package/xgboost/rabit/include/dmlc/logging.h
+        python-package/xgboost/rabit/include/dmlc/serializer.h
+        python-package/xgboost/rabit/include/dmlc/type_traits.h
+        python-package/xgboost/rabit/include/rabit/internal/engine.h
+        python-package/xgboost/rabit/include/rabit/internal/io.h
+        python-package/xgboost/rabit/include/rabit/internal/rabit-inl.h
+        python-package/xgboost/rabit/include/rabit/internal/timer.h
+        python-package/xgboost/rabit/include/rabit/internal/utils.h
+        python-package/xgboost/rabit/include/rabit/c_api.h
+        python-package/xgboost/rabit/include/rabit/rabit.h
+        python-package/xgboost/rabit/include/rabit/serializable.h
+        python-package/xgboost/rabit/src/allreduce_base.cc
+        python-package/xgboost/rabit/src/allreduce_base.h
+        python-package/xgboost/rabit/src/allreduce_mock.h
+        python-package/xgboost/rabit/src/allreduce_robust-inl.h
+        python-package/xgboost/rabit/src/allreduce_robust.cc
+        python-package/xgboost/rabit/src/allreduce_robust.h
+        python-package/xgboost/rabit/src/c_api.cc
+        python-package/xgboost/rabit/src/engine.cc
+        python-package/xgboost/rabit/src/engine_base.cc
+        python-package/xgboost/rabit/src/engine_empty.cc
+        python-package/xgboost/rabit/src/engine_mock.cc
+        python-package/xgboost/rabit/src/engine_mpi.cc
+        python-package/xgboost/rabit/src/socket.h
+        python-package/xgboost/rabit/src/thread_local.h
+        python-package/xgboost/rabit/test/lazy_recover.cc
+        python-package/xgboost/rabit/test/local_recover.cc
+        python-package/xgboost/rabit/test/model_recover.cc
+        python-package/xgboost/rabit/test/speed_test.cc
+        python-package/xgboost/src/c_api/c_api.cc
+        python-package/xgboost/src/c_api/c_api_error.cc
+        python-package/xgboost/src/c_api/c_api_error.h
+        python-package/xgboost/src/common/base64.h
+        python-package/xgboost/src/common/bitmap.h
+        python-package/xgboost/src/common/column_matrix.h
+        python-package/xgboost/src/common/common.cc
+        python-package/xgboost/src/common/common.h
+        python-package/xgboost/src/common/compressed_iterator.h
+        python-package/xgboost/src/common/config.h
+        python-package/xgboost/src/common/group_data.h
+        python-package/xgboost/src/common/hist_util.cc
+        python-package/xgboost/src/common/hist_util.h
+        python-package/xgboost/src/common/host_device_vector.cc
+        python-package/xgboost/src/common/host_device_vector.h
+        python-package/xgboost/src/common/io.h
+        python-package/xgboost/src/common/math.h
+        python-package/xgboost/src/common/quantile.h
+        python-package/xgboost/src/common/random.h
+        python-package/xgboost/src/common/row_set.h
+        python-package/xgboost/src/common/span.h
+        python-package/xgboost/src/common/sync.h
+        python-package/xgboost/src/common/timer.h
+        python-package/xgboost/src/common/transform.h
+        python-package/xgboost/src/data/data.cc
+        python-package/xgboost/src/data/simple_csr_source.cc
+        python-package/xgboost/src/data/simple_csr_source.h
+        python-package/xgboost/src/data/simple_dmatrix.cc
+        python-package/xgboost/src/data/simple_dmatrix.h
+        python-package/xgboost/src/data/sparse_page_dmatrix.cc
+        python-package/xgboost/src/data/sparse_page_dmatrix.h
+        python-package/xgboost/src/data/sparse_page_raw_format.cc
+        python-package/xgboost/src/data/sparse_page_source.cc
+        python-package/xgboost/src/data/sparse_page_source.h
+        python-package/xgboost/src/data/sparse_page_writer.cc
+        python-package/xgboost/src/data/sparse_page_writer.h
+        python-package/xgboost/src/gbm/gblinear.cc
+        python-package/xgboost/src/gbm/gblinear_model.h
+        python-package/xgboost/src/gbm/gbm.cc
+        python-package/xgboost/src/gbm/gbtree.cc
+        python-package/xgboost/src/gbm/gbtree_model.h
+        python-package/xgboost/src/linear/coordinate_common.h
+        python-package/xgboost/src/linear/linear_updater.cc
+        python-package/xgboost/src/linear/updater_coordinate.cc
+        python-package/xgboost/src/linear/updater_shotgun.cc
+        python-package/xgboost/src/metric/elementwise_metric.cc
+        python-package/xgboost/src/metric/metric.cc
+        python-package/xgboost/src/metric/multiclass_metric.cc
+        python-package/xgboost/src/metric/rank_metric.cc
+        python-package/xgboost/src/objective/hinge.cc
+        python-package/xgboost/src/objective/multiclass_obj.cc
+        python-package/xgboost/src/objective/objective.cc
+        python-package/xgboost/src/objective/rank_obj.cc
+        python-package/xgboost/src/objective/regression_loss.h
+        python-package/xgboost/src/objective/regression_obj.cc
+        python-package/xgboost/src/predictor/cpu_predictor.cc
+        python-package/xgboost/src/predictor/predictor.cc
+        python-package/xgboost/src/tree/fast_hist_param.h
+        python-package/xgboost/src/tree/param.h
+        python-package/xgboost/src/tree/split_evaluator.cc
+        python-package/xgboost/src/tree/split_evaluator.h
+        python-package/xgboost/src/tree/tree_model.cc
+        python-package/xgboost/src/tree/tree_updater.cc
+        python-package/xgboost/src/tree/updater_basemaker-inl.h
+        python-package/xgboost/src/tree/updater_colmaker.cc
+        python-package/xgboost/src/tree/updater_fast_hist.cc
+        python-package/xgboost/src/tree/updater_histmaker.cc
+        python-package/xgboost/src/tree/updater_prune.cc
+        python-package/xgboost/src/tree/updater_refresh.cc
+        python-package/xgboost/src/tree/updater_skmaker.cc
+        python-package/xgboost/src/tree/updater_sync.cc
+        R-package/src/init.c
+        R-package/src/xgboost_assert.c
+        R-package/src/xgboost_custom.cc
+        R-package/src/xgboost_R.cc
+        R-package/src/xgboost_R.h
+        rabit/guide/basic.cc
+        rabit/guide/broadcast.cc
+        rabit/guide/lazy_allreduce.cc
+        rabit/include/dmlc/base.h
+        rabit/include/dmlc/io.h
+        rabit/include/dmlc/logging.h
+        rabit/include/dmlc/serializer.h
+        rabit/include/dmlc/type_traits.h
+        rabit/include/rabit/internal/engine.h
+        rabit/include/rabit/internal/io.h
+        rabit/include/rabit/internal/rabit-inl.h
+        rabit/include/rabit/internal/timer.h
+        rabit/include/rabit/internal/utils.h
+        rabit/include/rabit/c_api.h
+        rabit/include/rabit/rabit.h
+        rabit/include/rabit/serializable.h
+        rabit/src/allreduce_base.cc
+        rabit/src/allreduce_base.h
+        rabit/src/allreduce_mock.h
+        rabit/src/allreduce_robust-inl.h
+        rabit/src/allreduce_robust.cc
+        rabit/src/allreduce_robust.h
+        rabit/src/c_api.cc
+        rabit/src/engine.cc
+        rabit/src/engine_base.cc
+        rabit/src/engine_empty.cc
+        rabit/src/engine_mock.cc
+        rabit/src/engine_mpi.cc
+        rabit/src/socket.h
+        rabit/src/thread_local.h
+        rabit/test/lazy_recover.cc
+        rabit/test/local_recover.cc
+        rabit/test/model_recover.cc
+        rabit/test/speed_test.cc
+        src/c_api/c_api.cc
+        src/c_api/c_api_error.cc
+        src/c_api/c_api_error.h
+        src/common/base64.h
+        src/common/bitmap.h
+        src/common/column_matrix.h
+        src/common/common.cc
+        src/common/common.h
+        src/common/compressed_iterator.h
+        src/common/config.h
+        src/common/group_data.h
+        src/common/hist_util.cc
+        src/common/hist_util.h
+        src/common/host_device_vector.cc
+        src/common/host_device_vector.h
+        src/common/io.h
+        src/common/math.h
+        src/common/quantile.h
+        src/common/random.h
+        src/common/row_set.h
+        src/common/span.h
+        src/common/sync.h
+        src/common/timer.h
+        src/common/transform.h
+        src/data/data.cc
+        src/data/simple_csr_source.cc
+        src/data/simple_csr_source.h
+        src/data/simple_dmatrix.cc
+        src/data/simple_dmatrix.h
+        src/data/sparse_page_dmatrix.cc
+        src/data/sparse_page_dmatrix.h
+        src/data/sparse_page_raw_format.cc
+        src/data/sparse_page_source.cc
+        src/data/sparse_page_source.h
+        src/data/sparse_page_writer.cc
+        src/data/sparse_page_writer.h
+        src/gbm/gblinear.cc
+        src/gbm/gblinear_model.h
+        src/gbm/gbm.cc
+        src/gbm/gbtree.cc
+        src/gbm/gbtree_model.h
+        src/linear/coordinate_common.h
+        src/linear/linear_updater.cc
+        src/linear/updater_coordinate.cc
+        src/linear/updater_shotgun.cc
+        src/metric/elementwise_metric.cc
+        src/metric/metric.cc
+        src/metric/multiclass_metric.cc
+        src/metric/rank_metric.cc
+        src/objective/hinge.cc
+        src/objective/multiclass_obj.cc
+        src/objective/objective.cc
+        src/objective/rank_obj.cc
+        src/objective/regression_loss.h
+        src/objective/regression_obj.cc
+        src/predictor/cpu_predictor.cc
+        src/predictor/predictor.cc
+        src/tree/fast_hist_param.h
+        src/tree/param.h
+        src/tree/split_evaluator.cc
+        src/tree/split_evaluator.h
+        src/tree/tree_model.cc
+        src/tree/tree_updater.cc
+        src/tree/updater_basemaker-inl.h
+        src/tree/updater_colmaker.cc
+        src/tree/updater_fast_hist.cc
+        src/tree/updater_histmaker.cc
+        src/tree/updater_prune.cc
+        src/tree/updater_refresh.cc
+        src/tree/updater_skmaker.cc
+        src/tree/updater_sync.cc
+        src/cli_main.cc
+        src/learner.cc
+        src/logging.cc
+        tests/cpp/c_api/test_c_api.cc
+        tests/cpp/common/test_column_matrix.cc
+        tests/cpp/common/test_common.cc
+        tests/cpp/common/test_compressed_iterator.cc
+        tests/cpp/common/test_random.cc
+        tests/cpp/common/test_span.cc
+        tests/cpp/common/test_span.h
+        tests/cpp/common/test_transform_range.cc
+        tests/cpp/data/test_metainfo.cc
+        tests/cpp/data/test_simple_csr_source.cc
+        tests/cpp/data/test_simple_dmatrix.cc
+        tests/cpp/data/test_sparse_page_dmatrix.cc
+        tests/cpp/linear/test_linear.cc
+        tests/cpp/metric/test_elementwise_metric.cc
+        tests/cpp/metric/test_metric.cc
+        tests/cpp/metric/test_multiclass_metric.cc
+        tests/cpp/metric/test_rank_metric.cc
+        tests/cpp/objective/test_hinge.cc
+        tests/cpp/objective/test_multiclass_obj.cc
+        tests/cpp/objective/test_objective.cc
+        tests/cpp/objective/test_ranking_obj.cc
+        tests/cpp/objective/test_regression_obj.cc
+        tests/cpp/predictor/test_cpu_predictor.cc
+        tests/cpp/tree/test_param.cc
+        tests/cpp/helpers.cc
+        tests/cpp/helpers.h
+        tests/cpp/test_learner.cc
+        tests/cpp/test_main.cc)
