@@ -420,12 +420,14 @@ class CQHistMaker: public HistMaker<TStats> {
       summary_array_[i].Reserve(max_size);
     }
     {
-      // get smmary
+      // get summary
       thread_sketch_.resize(omp_get_max_threads());
 
       // TWOPASS: use the real set + split set in the column iteration.
       this->SetDefaultPostion(p_fmat, tree);
+      // Nan: add the features taken as the split feature to the working set
       work_set_.insert(work_set_.end(), fsplit_set_.begin(), fsplit_set_.end());
+      // Nan: revise the work_set so that we have unique values there
       std::sort(work_set_.begin(), work_set_.end());
       work_set_.resize(std::unique(work_set_.begin(), work_set_.end()) - work_set_.begin());
 
@@ -434,7 +436,7 @@ class CQHistMaker: public HistMaker<TStats> {
         // TWOPASS: use the real set + split set in the column iteration.
         this->CorrectNonDefaultPositionByBatch(batch, fsplit_set_, tree);
 
-        // start enumeration
+        // Nan: start enumeration over all features currently in work_set
         const auto nsize = static_cast<bst_omp_uint>(work_set_.size());
         #pragma omp parallel for schedule(dynamic, 1)
         for (bst_omp_uint i = 0; i < nsize; ++i) {
@@ -560,12 +562,14 @@ class CQHistMaker: public HistMaker<TStats> {
     sbuilder.resize(tree.param.num_nodes);
     for (size_t i = 0; i < this->qexpand_.size(); ++i) {
       const unsigned nid = this->qexpand_[i];
+      // Nan: it's actually the index in qexpand
       const unsigned wid = this->node2workindex_[nid];
       sbuilder[nid].sum_total = 0.0f;
       sbuilder[nid].sketch = &sketchs_[wid * work_set_size + offset];
     }
 
     // first pass, get sum of weight, TODO, optimization to skip first pass
+    // Nan: check the paper, we need to get the total sum of second order gradient for the feature
     for (const auto& c : col) {
         const bst_uint ridx = c.index;
         const int nid = this->position_[ridx];
@@ -593,6 +597,7 @@ class CQHistMaker: public HistMaker<TStats> {
       bst_uint align_length = col.size() / kBuffer * kBuffer;
       int buf_position[kBuffer];
       bst_float buf_hess[kBuffer];
+      // Nan: for cache friendly purpose
       for (bst_uint j = 0; j < align_length; j += kBuffer) {
         for (bst_uint i = 0; i < kBuffer; ++i) {
           bst_uint ridx = col[j + i].index;
@@ -606,6 +611,7 @@ class CQHistMaker: public HistMaker<TStats> {
           }
         }
       }
+      // Nan: fill the value missed by the last for loop
       for (bst_uint j = align_length; j < col.size(); ++j) {
         const bst_uint ridx = col[j].index;
         const int nid = this->position_[ridx];

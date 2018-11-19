@@ -1,8 +1,4 @@
 cmake_minimum_required(VERSION 3.10)
-
-set(CMAKE_C_COMPILER "/Users/nanzhu/code/clang-5.0.1/bin/clang")
-set(CMAKE_CXX_COMPILER "/Users/nanzhu/code/clang-5.0.1/bin/clang++")
-
 project(xgboost)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -15,9 +11,30 @@ include_directories(dmlc-core/include/dmlc)
 include_directories(dmlc-core/src/data)
 include_directories(dmlc-core/src/io)
 include_directories(include)
+include_directories(include/xgboost)
 include_directories(jvm-packages/xgboost4j/src/native)
+include_directories(nccl)
 include_directories(nccl/src)
+include_directories(nccl/test)
 include_directories(nccl/test/include)
+include_directories(python-package/xgboost/dmlc-core/include)
+include_directories(python-package/xgboost/dmlc-core/include/dmlc)
+include_directories(python-package/xgboost/dmlc-core/src/data)
+include_directories(python-package/xgboost/dmlc-core/src/io)
+include_directories(python-package/xgboost/include)
+include_directories(python-package/xgboost/include/xgboost)
+include_directories(python-package/xgboost/rabit/include)
+include_directories(python-package/xgboost/rabit/include/dmlc)
+include_directories(python-package/xgboost/rabit/include/rabit)
+include_directories(python-package/xgboost/rabit/include/rabit/internal)
+include_directories(python-package/xgboost/rabit/src)
+include_directories(python-package/xgboost/src/c_api)
+include_directories(python-package/xgboost/src/common)
+include_directories(python-package/xgboost/src/data)
+include_directories(python-package/xgboost/src/gbm)
+include_directories(python-package/xgboost/src/linear)
+include_directories(python-package/xgboost/src/objective)
+include_directories(python-package/xgboost/src/tree)
 include_directories(R-package/src)
 include_directories(rabit/include)
 include_directories(rabit/include/dmlc)
@@ -35,151 +52,13 @@ include_directories(tests/cpp)
 include_directories(tests/cpp/common)
 
 add_executable(xgboost
-        cub/cub/agent/agent_histogram.cuh
-        cub/cub/agent/agent_radix_sort_downsweep.cuh
-        cub/cub/agent/agent_radix_sort_upsweep.cuh
-        cub/cub/agent/agent_reduce.cuh
-        cub/cub/agent/agent_reduce_by_key.cuh
-        cub/cub/agent/agent_rle.cuh
-        cub/cub/agent/agent_scan.cuh
-        cub/cub/agent/agent_segment_fixup.cuh
-        cub/cub/agent/agent_select_if.cuh
-        cub/cub/agent/agent_spmv_csrt.cuh
-        cub/cub/agent/agent_spmv_orig.cuh
-        cub/cub/agent/agent_spmv_row_based.cuh
-        cub/cub/agent/single_pass_scan_operators.cuh
-        cub/cub/block/specializations/block_histogram_atomic.cuh
-        cub/cub/block/specializations/block_histogram_sort.cuh
-        cub/cub/block/specializations/block_reduce_raking.cuh
-        cub/cub/block/specializations/block_reduce_raking_commutative_only.cuh
-        cub/cub/block/specializations/block_reduce_warp_reductions.cuh
-        cub/cub/block/specializations/block_scan_raking.cuh
-        cub/cub/block/specializations/block_scan_warp_scans.cuh
-        cub/cub/block/specializations/block_scan_warp_scans2.cuh
-        cub/cub/block/specializations/block_scan_warp_scans3.cuh
-        cub/cub/block/block_adjacent_difference.cuh
-        cub/cub/block/block_discontinuity.cuh
-        cub/cub/block/block_exchange.cuh
-        cub/cub/block/block_histogram.cuh
-        cub/cub/block/block_load.cuh
-        cub/cub/block/block_radix_rank.cuh
-        cub/cub/block/block_radix_sort.cuh
-        cub/cub/block/block_raking_layout.cuh
-        cub/cub/block/block_reduce.cuh
-        cub/cub/block/block_scan.cuh
-        cub/cub/block/block_shuffle.cuh
-        cub/cub/block/block_store.cuh
-        cub/cub/device/dispatch/dispatch_histogram.cuh
-        cub/cub/device/dispatch/dispatch_radix_sort.cuh
-        cub/cub/device/dispatch/dispatch_reduce.cuh
-        cub/cub/device/dispatch/dispatch_reduce_by_key.cuh
-        cub/cub/device/dispatch/dispatch_rle.cuh
-        cub/cub/device/dispatch/dispatch_scan.cuh
-        cub/cub/device/dispatch/dispatch_select_if.cuh
-        cub/cub/device/dispatch/dispatch_spmv_csrt.cuh
-        cub/cub/device/dispatch/dispatch_spmv_orig.cuh
-        cub/cub/device/dispatch/dispatch_spmv_row_based.cuh
-        cub/cub/device/device_histogram.cuh
-        cub/cub/device/device_partition.cuh
-        cub/cub/device/device_radix_sort.cuh
-        cub/cub/device/device_reduce.cuh
-        cub/cub/device/device_run_length_encode.cuh
-        cub/cub/device/device_scan.cuh
-        cub/cub/device/device_segmented_radix_sort.cuh
-        cub/cub/device/device_segmented_reduce.cuh
-        cub/cub/device/device_select.cuh
-        cub/cub/device/device_spmv.cuh
-        cub/cub/grid/grid_barrier.cuh
-        cub/cub/grid/grid_even_share.cuh
-        cub/cub/grid/grid_mapping.cuh
-        cub/cub/grid/grid_queue.cuh
-        cub/cub/host/mutex.cuh
-        cub/cub/iterator/arg_index_input_iterator.cuh
-        cub/cub/iterator/cache_modified_input_iterator.cuh
-        cub/cub/iterator/cache_modified_output_iterator.cuh
-        cub/cub/iterator/constant_input_iterator.cuh
-        cub/cub/iterator/counting_input_iterator.cuh
-        cub/cub/iterator/discard_output_iterator.cuh
-        cub/cub/iterator/tex_obj_input_iterator.cuh
-        cub/cub/iterator/tex_ref_input_iterator.cuh
-        cub/cub/iterator/transform_input_iterator.cuh
-        cub/cub/thread/thread_load.cuh
-        cub/cub/thread/thread_operators.cuh
-        cub/cub/thread/thread_reduce.cuh
-        cub/cub/thread/thread_scan.cuh
-        cub/cub/thread/thread_search.cuh
-        cub/cub/thread/thread_store.cuh
-        cub/cub/warp/specializations/warp_reduce_shfl.cuh
-        cub/cub/warp/specializations/warp_reduce_smem.cuh
-        cub/cub/warp/specializations/warp_scan_shfl.cuh
-        cub/cub/warp/specializations/warp_scan_smem.cuh
-        cub/cub/warp/warp_reduce.cuh
-        cub/cub/warp/warp_scan.cuh
-        cub/cub/cub.cuh
-        cub/cub/util_allocator.cuh
-        cub/cub/util_arch.cuh
-        cub/cub/util_debug.cuh
-        cub/cub/util_device.cuh
-        cub/cub/util_macro.cuh
-        cub/cub/util_namespace.cuh
-        cub/cub/util_ptx.cuh
-        cub/cub/util_type.cuh
-        cub/examples/block/example_block_radix_sort.cu
-        cub/examples/block/example_block_reduce.cu
-        cub/examples/block/example_block_scan.cu
-        cub/examples/block/Makefile
-        cub/examples/block/reduce_by_key.cu
-        cub/examples/device/example_device_partition_flagged.cu
-        cub/examples/device/example_device_partition_if.cu
-        cub/examples/device/example_device_radix_sort.cu
-        cub/examples/device/example_device_reduce.cu
-        cub/examples/device/example_device_scan.cu
-        cub/examples/device/example_device_select_flagged.cu
-        cub/examples/device/example_device_select_if.cu
-        cub/examples/device/example_device_select_unique.cu
-        cub/examples/device/example_device_sort_find_non_trivial_runs.cu
-        cub/examples/device/Makefile
-        cub/experimental/defunct/example_coo_spmv.cu
-        cub/experimental/defunct/test_device_seg_reduce.cu
         cub/experimental/histogram/histogram_cub.h
         cub/experimental/histogram/histogram_gmem_atomics.h
         cub/experimental/histogram/histogram_smem_atomics.h
-        cub/experimental/histogram_compare.cu
-        cub/experimental/Makefile
         cub/experimental/sparse_matrix.h
-        cub/experimental/spmv_compare.cu
-        cub/experimental/spmv_script.sh
-        cub/test/link_a.cu
-        cub/test/link_b.cu
         cub/test/link_main.cpp
-        cub/test/Makefile
         cub/test/mersenne.h
-        cub/test/test_allocator.cu
-        cub/test/test_block_histogram.cu
-        cub/test/test_block_load_store.cu
-        cub/test/test_block_radix_sort.cu
-        cub/test/test_block_reduce.cu
-        cub/test/test_block_scan.cu
-        cub/test/test_device_histogram.cu
-        cub/test/test_device_radix_sort.cu
-        cub/test/test_device_reduce.cu
-        cub/test/test_device_reduce_by_key.cu
-        cub/test/test_device_run_length_encode.cu
-        cub/test/test_device_scan.cu
-        cub/test/test_device_select_if.cu
-        cub/test/test_device_select_unique.cu
-        cub/test/test_grid_barrier.cu
-        cub/test/test_iterator.cu
         cub/test/test_util.h
-        cub/test/test_warp_reduce.cu
-        cub/test/test_warp_scan.cu
-        cub/tune/Makefile
-        cub/tune/tune_device_reduce.cu
-        cub/CHANGE_LOG.TXT
-        cub/common.mk
-        "cub/eclipse code style profile.xml"
-        cub/LICENSE.TXT
-        cub/README.md
         dmlc-core/example/parameter.cc
         dmlc-core/include/dmlc/any.h
         dmlc-core/include/dmlc/array_view.h
@@ -295,61 +174,16 @@ add_executable(xgboost
         include/xgboost/tree_updater.h
         jvm-packages/xgboost4j/src/native/xgboost4j.cpp
         jvm-packages/xgboost4j/src/native/xgboost4j.h
-        nccl/debian/source/format
-        nccl/debian/changelog.in
-        nccl/debian/compat
-        nccl/debian/control.in
-        nccl/debian/libnccl-dev.install
-        nccl/debian/libnccl-dev.manpages
-        nccl/debian/libnccl1.install.in
-        nccl/debian/nccl.7
-        nccl/debian/rules
-        nccl/debian/shlibs.local.in
-        nccl/fortran/src/cudafor.f90
-        nccl/fortran/src/ncclfor.f90
-        nccl/fortran/test/allgather_arr_out.f90
-        nccl/fortran/test/allgather_ptr_out.f90
-        nccl/fortran/test/allreduce_arr_out.f90
-        nccl/fortran/test/allreduce_ptr_out.f90
-        nccl/fortran/test/broadcast_arr.f90
-        nccl/fortran/test/broadcast_ptr.f90
-        nccl/fortran/test/reduce_arr_out.f90
-        nccl/fortran/test/reduce_ptr_out.f90
-        nccl/fortran/test/reducescatter_arr_out.f90
-        nccl/fortran/test/reducescatter_ptr_out.f90
-        nccl/fortran/Makefile
-        nccl/src/all_gather.cu
-        nccl/src/all_reduce.cu
-        nccl/src/broadcast.cu
         nccl/src/common_coll.h
         nccl/src/common_kernel.h
         nccl/src/copy_kernel.h
-        nccl/src/core.cu
         nccl/src/core.h
         nccl/src/enqueue.h
-        nccl/src/libwrap.cu
         nccl/src/libwrap.h
         nccl/src/nccl.h
         nccl/src/primitives.h
-        nccl/src/reduce.cu
         nccl/src/reduce_kernel.h
-        nccl/src/reduce_scatter.cu
         nccl/test/include/test_utilities.h
-        nccl/test/mpi/mpi_test.cu
-        nccl/test/single/all_gather_scan.cu
-        nccl/test/single/all_gather_test.cu
-        nccl/test/single/all_reduce_scan.cu
-        nccl/test/single/all_reduce_test.cu
-        nccl/test/single/broadcast_scan.cu
-        nccl/test/single/broadcast_test.cu
-        nccl/test/single/reduce_scan.cu
-        nccl/test/single/reduce_scatter_scan.cu
-        nccl/test/single/reduce_scatter_test.cu
-        nccl/test/single/reduce_test.cu
-        nccl/CMakeLists.txt
-        nccl/LICENSE.txt
-        nccl/Makefile
-        nccl/README.md
         plugin/dense_parser/dense_libsvm.cc
         plugin/example/custom_obj.cc
         plugin/lz4/sparse_page_lz4_format.cc

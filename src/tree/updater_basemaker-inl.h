@@ -363,6 +363,7 @@ class BaseMaker: public TreeUpdater {
     /*! \brief total sum of amount to be met */
     double sum_total;
     /*! \brief statistics used in the sketch */
+    // Nan: rmin -> minimum rank, wmin -> minimum weights
     double rmin, wmin;
     /*! \brief last seen feature value */
     bst_float last_fvalue;
@@ -383,6 +384,9 @@ class BaseMaker: public TreeUpdater {
      * \param w weight
      * \param max_size
      */
+    // Nan: w is supposed to be the second order gradient
+    // Nan: max_size is determined by (sketch_ratio / sketch_eps), where sketch_ratio is 2 by default
+    // and sketch_eps is 0.03; sketch_eps decides the gap between two bins
     inline void Push(bst_float fvalue, bst_float w, unsigned max_size) {
       if (next_goal == -1.0f) {
         next_goal = 0.0f;
@@ -396,6 +400,7 @@ class BaseMaker: public TreeUpdater {
           if (sketch->temp.size == 0 ||
               last_fvalue > sketch->temp.data[sketch->temp.size-1].value) {
             // push to sketch
+            // Nan Zhu: rmin and rmax are setting the boundary of each rank,
             sketch->temp.data[sketch->temp.size] =
                 common::WXQuantileSketch<bst_float, bst_float>::
                 Entry(static_cast<bst_float>(rmin),
@@ -409,6 +414,8 @@ class BaseMaker: public TreeUpdater {
           if (sketch->temp.size == max_size) {
             next_goal = sum_total * 2.0f + 1e-5f;
           } else {
+            // Nan: next_goal is set to distribute the overall sum of second order of gradient
+            // proportionally to each bin.
             next_goal = static_cast<bst_float>(sketch->temp.size * sum_total / max_size);
           }
         } else {
@@ -449,7 +456,7 @@ class BaseMaker: public TreeUpdater {
   /*! \brief queue of nodes to be expanded */
   std::vector<int> qexpand_;
   /*!
-   * \brief map active node to is working index offset in qexpand,
+   * \brief map active node to its working index offset in qexpand,
    *   can be -1, which means the node is node actively expanding
    */
   std::vector<int> node2workindex_;
