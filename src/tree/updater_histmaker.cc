@@ -223,10 +223,12 @@ class HistMaker: public BaseMaker {
     std::vector<SplitEntry> sol(qexpand_.size());
     std::vector<TStats> left_sum(qexpand_.size());
     auto nexpand = static_cast<bst_omp_uint>(qexpand_.size());
+    // Nan: for each node
     #pragma omp parallel for schedule(dynamic, 1)
     for (bst_omp_uint wid = 0; wid < nexpand; ++wid) {
       const int nid = qexpand_[wid];
       CHECK_EQ(node2workindex_[nid], static_cast<int>(wid));
+      // Nan: best represents the best split for node locates in qexpand[wid]
       SplitEntry &best = sol[wid];
       TStats &node_sum = wspace_.hset[0][num_feature + wid * (num_feature + 1)].data[0];
       for (size_t i = 0; i < fset.size(); ++i) {
@@ -464,8 +466,10 @@ class CQHistMaker: public HistMaker<TStats> {
     this->wspace_.cut.clear();
     this->wspace_.rptr.clear();
     this->wspace_.rptr.push_back(0);
+    // Nan: for each node
     for (size_t wid = 0; wid < this->qexpand_.size(); ++wid) {
       for (unsigned int i : fset) {
+        // Nan: offset in workingset of features
         int offset = feat2workindex_[i];
         if (offset >= 0) {
           const WXQSketch::Summary &a = summary_array_[wid * work_set_size + offset];
@@ -513,6 +517,9 @@ class CQHistMaker: public HistMaker<TStats> {
       const unsigned nid = this->qexpand_[i];
       const unsigned wid = this->node2workindex_[nid];
       hbuilder[nid].istart = 0;
+      // Nan: fid_offset is the offset in working_set
+      // Nan: wspace_ is thread's work space
+      // we actually only used the first element in hset
       hbuilder[nid].hist = this->wspace_.hset[0][fid_offset + wid * (fset.size()+1)];
     }
     if (TStats::kSimpleStats != 0 && this->param_.cache_opt != 0) {
@@ -660,6 +667,8 @@ class CQHistMaker: public HistMaker<TStats> {
 };
 
 // global proposal
+// Nan: GlobalProposalHistMaker is constructed by passing GradStats is template parameter
+// GradStats has sum_grads and sum_hess
 template<typename TStats>
 class GlobalProposalHistMaker: public CQHistMaker<TStats> {
  protected:
@@ -710,6 +719,8 @@ class GlobalProposalHistMaker: public CQHistMaker<TStats> {
     this->wspace_.Init(this->param_, 1);
     // to gain speedup in recovery
     {
+      //Nan: thread_hist is the working space for each thread to update the histogram
+      //HistEntry is the proxy to update each histogram which is represented by HistUnit
       this->thread_hist_.resize(omp_get_max_threads());
 
       // TWOPASS: use the real set + split set in the column iteration.
