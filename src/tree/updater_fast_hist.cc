@@ -69,6 +69,7 @@ class FastHistMaker: public TreeUpdater {
     GradStats::CheckInfo(dmat->Info());
     if (is_gmat_initialized_ == false) {
       double tstart = dmlc::GetTime();
+      // Nan: get the sketch of the system
       gmat_.Init(dmat, static_cast<uint32_t>(param_.max_bin));
       column_matrix_.Init(gmat_, fhparam_.sparse_threshold);
       if (fhparam_.enable_feature_grouping > 0) {
@@ -204,6 +205,7 @@ class FastHistMaker: public TreeUpdater {
           (*p_tree)[nid].SetLeaf(snode_[nid].weight * param_.learning_rate);
         } else {
           tstart = dmlc::GetTime();
+          // Nan: get left and right children
           this->ApplySplit(nid, gmat, column_matrix, hist_, *p_fmat, p_tree);
           time_apply_split += dmlc::GetTime() - tstart;
 
@@ -212,6 +214,7 @@ class FastHistMaker: public TreeUpdater {
           const int cright = (*p_tree)[nid].RightChild();
           hist_.AddHistRow(cleft);
           hist_.AddHistRow(cright);
+          // Nan: try to build histogram with the node containing less # of elements
           if (row_set_collection_[cleft].Size() < row_set_collection_[cright].Size()) {
             BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
             SubtractionTrick(hist_[cright], hist_[cleft], hist_[nid]);
@@ -827,6 +830,7 @@ class FastHistMaker: public TreeUpdater {
     int nthread_;
     common::ColumnSampler column_sampler_;
     // the internal row sets
+    // Nan: the set of rows per each node
     RowSetCollection row_set_collection_;
     // the temp space for split
     std::vector<RowSetCollection::Split> row_split_tloc_;

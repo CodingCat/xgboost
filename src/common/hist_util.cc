@@ -124,6 +124,7 @@ uint32_t HistCutMatrix::GetBinIdx(const Entry& e) {
 }
 
 void GHistIndexMatrix::Init(DMatrix* p_fmat, int max_num_bins) {
+  // Nan: get the sketch of all columns
   cut.Init(p_fmat, max_num_bins);
 
   const int nthread = omp_get_max_threads();
@@ -394,6 +395,7 @@ void GHistIndexBlockMatrix::Init(const GHistIndexMatrix& gmat,
   }
 }
 
+// Nan: row_indices means the index of rows belonging to the node corresponding to hist
 void GHistBuilder::BuildHist(const std::vector<GradientPair>& gpair,
                              const RowSetCollection::Elem row_indices,
                              const GHistIndexMatrix& gmat,
