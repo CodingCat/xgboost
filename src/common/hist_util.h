@@ -98,8 +98,10 @@ struct GHistIndexRow {
  */
 struct GHistIndexMatrix {
   /*! \brief row pointer to rows by element position */
+  // Nan: the pointer to the start of each row
   std::vector<size_t> row_ptr;
   /*! \brief The index data */
+  // Nan: the column index of each row
   std::vector<uint32_t> index;
   /*! \brief hit count of each index */
   std::vector<size_t> hit_count;

@@ -136,13 +136,16 @@ void GHistIndexMatrix::Init(DMatrix* p_fmat, int max_num_bins) {
   for (const auto &batch : p_fmat->GetRowBatches()) {
     const size_t rbegin = row_ptr.size() - 1;
     for (size_t i = 0; i < batch.Size(); ++i) {
+      // Nan: batch[i].size() means the non-zero values of the current row
       row_ptr.push_back(batch[i].size() + row_ptr.back());
     }
+    // Nan: index stores the bin index
     index.resize(row_ptr.back());
 
     CHECK_GT(cut.cut.size(), 0U);
     CHECK_EQ(cut.row_ptr.back(), cut.cut.size());
-
+    // Nan: number of rows (in updater_histmaker, we do transport over the matrix so batch.Size()
+    // returns the number of columns, that's the differences here
     auto bsize = static_cast<omp_ulong>(batch.Size());
     #pragma omp parallel for num_threads(nthread) schedule(static)
     for (omp_ulong i = 0; i < bsize; ++i) { // NOLINT(*)
@@ -152,9 +155,11 @@ void GHistIndexMatrix::Init(DMatrix* p_fmat, int max_num_bins) {
       SparsePage::Inst inst = batch[i];
 
       CHECK_EQ(ibegin + inst.size(), iend);
+      // Nan: inst.size() is the number of columns
       for (bst_uint j = 0; j < inst.size(); ++j) {
+        // Nan: inst[j].index represents the feature index
         uint32_t idx = cut.GetBinIdx(inst[j]);
-
+        // Nan: ibegin is the start of the current column
         index[ibegin + j] = idx;
         ++hit_count_tloc_[tid * nbins + idx];
       }
