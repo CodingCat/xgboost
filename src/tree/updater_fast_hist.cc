@@ -214,8 +214,8 @@ class FastHistMaker: public TreeUpdater {
           const int cright = (*p_tree)[nid].RightChild();
           hist_.AddHistRow(cleft);
           hist_.AddHistRow(cright);
-          // Nan: try to build histogram with the node containing less # of elements
           if (row_set_collection_[cleft].Size() < row_set_collection_[cright].Size()) {
+            // Nan: try to build histogram with the node containing less # of elements
             BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
             SubtractionTrick(hist_[cright], hist_[cleft], hist_[nid]);
           } else {
