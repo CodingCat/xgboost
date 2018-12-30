@@ -352,15 +352,18 @@ object XGBoost extends Serializable {
         group => (TaskContext.getPartitionId(), group))
 
     // group chunks from different partitions together by group id in XGBLabeledPoint.
-    // use groupBy instead of aggregateBy since all groups within a partition have unique groud ids.
+    // use groupBy instead of aggregateBy since all groups within a partition have unique group ids.
     val stitchedGroups: RDD[Array[XGBLabeledPoint]] = edgeGroups.groupBy(_._2.groupId).map(
       groups => {
         val it: Iterable[(Int, XGBLabeledPointGroup)] = groups._2
-        // sorted by partition id and merge list of Array[XGBLabeledPoint] into one array
-        it.toArray.sortBy(_._1).map(_._2.points).flatten
+        // sorted by group id and merge list of Array[XGBLabeledPoint] into one array
+        it.toArray.sortBy(_._1).flatMap(_._2.points)
       })
 
-    var allGroups = normalGroups.union(stitchedGroups)
+    val allGroups = normalGroups.union(stitchedGroups)
+
+    println("element num: " + allGroups.count())
+    println("number of partitions: " + allGroups.partitions.length)
     logger.info(s"repartitioning training group set to $nWorkers partitions")
     allGroups.repartition(nWorkers)
   }
@@ -532,7 +535,7 @@ private[spark] class LabeledPointGroupIterator(base: Iterator[XGBLabeledPoint])
   private var isNewGroup = false
 
   override def hasNext: Boolean = {
-    return base.hasNext || isNewGroup
+    base.hasNext || isNewGroup
   }
 
   override def next(): XGBLabeledPointGroup = {

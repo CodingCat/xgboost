@@ -98,7 +98,7 @@ class XGBoostRegressorSuite extends FunSuite with PerTest {
       "objective" -> "rank:pairwise", "num_workers" -> numWorkers, "num_round" -> 5,
       "group_col" -> "group")
 
-    val trainingDF = buildDataFrameWithGroup(Ranking.train)
+    val trainingDF = buildDataFrameWithGroup(Ranking.train).repartition(numWorkers)
     val testDF = buildDataFrame(Ranking.test)
     val model = new XGBoostRegressor(paramMap).fit(trainingDF)
 

@@ -258,19 +258,20 @@ class XGBoostGeneralSuite extends FunSuite with PerTest {
   }
 
   test("repartitionForTrainingGroup with group data which has empty partition") {
-    val trainingRDD = sc.parallelize(Ranking.train, 5).mapPartitions(it => {
-      // make one partition empty for testing
-      it.filter(_ => TaskContext.getPartitionId() != 3)
-    })
-    XGBoost.repartitionForTrainingGroup(trainingRDD, 4)
+    val trainingRDD = sc.parallelize(Ranking.train, math.min(1, numWorkers / 2)).mapPartitions(
+      it => {
+        // make one partition empty for testing
+        it.filter(_ => TaskContext.getPartitionId() != 0)
+      })
+    XGBoost.repartitionForTrainingGroup(trainingRDD, numWorkers).count()
   }
 
   test("distributed training with group data") {
-    val trainingRDD = sc.parallelize(Ranking.train, 5)
-    val (booster, metrics) = XGBoost.trainDistributed(
+    val trainingRDD = sc.parallelize(Ranking.train, numWorkers)
+    val (booster, _) = XGBoost.trainDistributed(
       trainingRDD,
       List("eta" -> "1", "max_depth" -> "6", "silent" -> "1",
-        "objective" -> "binary:logistic", "num_round" -> 5, "num_workers" -> numWorkers,
+        "objective" -> "rank:pairwise", "num_round" -> 5, "num_workers" -> numWorkers,
         "custom_eval" -> null, "custom_obj" -> null, "use_external_memory" -> false,
         "missing" -> Float.NaN).toMap,
       hasGroup = true)
