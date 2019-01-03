@@ -4,8 +4,8 @@
   <artifactId>xgboost4j-example</artifactId>
   <versioning>
     <versions>
-      <version>0.81-SNAPSHOT</version>
+      <version>0.82-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20180914222456</lastUpdated>
+    <lastUpdated>20190103190326</lastUpdated>
   </versioning>
 </metadata>
