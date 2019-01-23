@@ -71,7 +71,6 @@ class ColumnMatrix {
                 double  sparse_threshold) {
     const auto nfeature = static_cast<bst_uint>(gmat.cut.row_ptr.size() - 1);
     const size_t nrow = gmat.row_ptr.size() - 1;
-
     // identify type of each column
     feature_counts_.resize(nfeature);
     type_.resize(nfeature);
@@ -131,7 +130,6 @@ class ColumnMatrix {
         // max() indicates missing values
       }
     }
-
     // loop over all rows and fill column entries
     // num_nonzeros[fid] = how many nonzeros have this feature accumulated so far?
     std::vector<size_t> num_nonzeros;
@@ -143,7 +141,7 @@ class ColumnMatrix {
       size_t fid = 0;
       for (size_t i = ibegin; i < iend; ++i) {
         const uint32_t bin_id = gmat.index[i];
-        while (bin_id >= gmat.cut.row_ptr[fid + 1]) {
+        while (fid + 1 < gmat.cut.row_ptr.size() && bin_id >= gmat.cut.row_ptr[fid + 1]) {
           ++fid;
         }
         if (type_[fid] == kDenseColumn) {
