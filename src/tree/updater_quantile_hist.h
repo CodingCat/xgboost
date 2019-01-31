@@ -111,17 +111,6 @@ class QuantileHistMaker: public TreeUpdater {
       }
     }
 
-    inline void initColSampler(MetaInfo info) {
-      // initialize feature index
-      if (data_layout_ == kDenseDataOneBased) {
-        column_sampler_.Init(info.num_col_, param_.colsample_bynode,
-                             param_.colsample_bylevel, param_.colsample_bytree, true);
-      } else {
-        column_sampler_.Init(info.num_col_, param_.colsample_bynode,
-                             param_.colsample_bylevel, param_.colsample_bytree, false);
-      }
-    }
-
     inline void SubtractionTrick(GHistRow self, GHistRow sibling, GHistRow parent) {
       hist_builder_.SubtractionTrick(self, sibling, parent);
     }
@@ -129,7 +118,6 @@ class QuantileHistMaker: public TreeUpdater {
     bool UpdatePredictionCache(const DMatrix* data,
                                HostDeviceVector<bst_float>* p_out_preds);
 
-    common::ColumnSampler column_sampler_;
   protected:
     // initialize temp data structure
     void InitData(const GHistIndexMatrix& gmat,
@@ -224,6 +212,7 @@ class QuantileHistMaker: public TreeUpdater {
     const TrainParam& param_;
     // number of omp thread used during training
     int nthread_;
+    common::ColumnSampler column_sampler_;
     // the internal row sets
     RowSetCollection row_set_collection_;
     // the temp space for split
