@@ -83,7 +83,7 @@ public class BoosterImplTest {
     //train a boost model
     return XGBoost.train(trainMat, paramMap, round, watches, null, null);
   }
-
+  
   @Test
   public void testBoosterBasic() throws XGBoostError, IOException {
 
@@ -536,15 +536,12 @@ public class BoosterImplTest {
   @Test
   public void testFastHistoDepthwiseMaxDepth() throws XGBoostError {
     DMatrix trainMat = new DMatrix("../../demo/data/agaricus.txt.train");
-    DMatrix testMat = new DMatrix("../../demo/data/agaricus.txt.test");
-    // testBoosterWithFastHistogram(trainMat, testMat);
     Map<String, Object> paramMap = new HashMap<String, Object>() {
       {
         put("max_depth", 3);
         put("silent", 1);
         put("objective", "binary:logistic");
         put("tree_method", "hist");
-        put("max_depth", 2);
         put("grow_policy", "depthwise");
         put("eval_metric", "auc");
       }
