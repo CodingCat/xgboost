@@ -749,13 +749,12 @@ class LearnerImpl : public Learner {
     MetaInfo const& info = p_fmat->Info();
     auto const& weights = info.weights_.HostVector();
     if (info.group_ptr_.size() != 0 && weights.size() != 0) {
-      CHECK(weights.size() == info.group_ptr_.size() - 1 ||
-            weights.size() == p_fmat->Info().num_row_)
+      CHECK(weights.size() == info.group_ptr_.size() - 1)
           << "\n"
           << "weights size: " << weights.size()            << ", "
           << "groups size: "  << info.group_ptr_.size() -1 << ", "
           << "num rows: "     << p_fmat->Info().num_row_   << "\n"
-          << "Number of weights should be equal to number of instances or number of groups.";
+          << "Number of weights should be equal to number of groups.";
     }
   }
 
