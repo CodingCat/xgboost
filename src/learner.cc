@@ -748,9 +748,9 @@ class LearnerImpl : public Learner {
   void ValidateDMatrix(DMatrix* p_fmat) {
     MetaInfo const& info = p_fmat->Info();
     auto const& weights = info.weights_.HostVector();
-    if (info.group_ptr_.size() != 0) {
+    if (info.group_ptr_.size() != 0 && weights.size() != 0) {
       CHECK(weights.size() == info.group_ptr_.size() - 1 ||
-            p_fmat->Info().num_row_ == info.group_ptr_.size())
+            weights.size() == p_fmat->Info().num_row_)
           << "\n"
           << "weights size: " << weights.size()            << ", "
           << "groups size: "  << info.group_ptr_.size() -1 << ", "

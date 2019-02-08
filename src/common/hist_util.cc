@@ -65,7 +65,6 @@ void HistCutMatrix::Init(DMatrix* p_fmat, uint32_t max_num_bins) {
               info.group_ptr_[group_ind] == ridx &&
               group_ind < info.group_ptr_.size() - 2) {
             group_ind++;
-            CHECK_GT(info.group_ptr_[group_ind], info.group_ptr_[group_ind-1]);
           }
           for (auto& entry : inst) {
             if (entry.index >= begin && entry.index < end) {
