@@ -474,12 +474,16 @@ class LearnerImpl : public Learner {
 
   void UpdateOneIter(int iter, DMatrix* train) override {
     monitor_.Start("UpdateOneIter");
+
+    // TODO(trivialfis): Merge the duplicated code with BoostOneIter
     CHECK(ModelInitialized())
         << "Always call InitModel or LoadModel before update";
     if (tparam_.seed_per_iteration || rabit::IsDistributed()) {
       common::GlobalRandom().seed(tparam_.seed * kRandSeedMagic + iter);
     }
+    this->ValidateDMatrix(train);
     this->PerformTreeMethodHeuristic(train);
+
     monitor_.Start("PredictRaw");
     this->PredictRaw(train, &preds_);
     monitor_.Stop("PredictRaw");
@@ -493,10 +497,15 @@ class LearnerImpl : public Learner {
   void BoostOneIter(int iter, DMatrix* train,
                     HostDeviceVector<GradientPair>* in_gpair) override {
     monitor_.Start("BoostOneIter");
+
+    CHECK(ModelInitialized())
+        << "Always call InitModel or LoadModel before update";
     if (tparam_.seed_per_iteration || rabit::IsDistributed()) {
       common::GlobalRandom().seed(tparam_.seed * kRandSeedMagic + iter);
     }
+    this->ValidateDMatrix(train);
     this->PerformTreeMethodHeuristic(train);
+
     gbm_->DoBoost(train, in_gpair);
     monitor_.Stop("BoostOneIter");
   }
@@ -734,6 +743,20 @@ class LearnerImpl : public Learner {
     CHECK(gbm_ != nullptr)
         << "Predict must happen after Load or InitModel";
     gbm_->PredictBatch(data, out_preds, ntree_limit);
+  }
+
+  void ValidateDMatrix(DMatrix* p_fmat) {
+    MetaInfo const& info = p_fmat->Info();
+    auto const& weights = info.weights_.HostVector();
+    if (info.group_ptr_.size() != 0) {
+      CHECK(weights.size() == info.group_ptr_.size() - 1 ||
+            p_fmat->Info().num_row_ == info.group_ptr_.size())
+          << "\n"
+          << "weights size: " << weights.size()            << ", "
+          << "groups size: "  << info.group_ptr_.size() -1 << ", "
+          << "num rows: "     << p_fmat->Info().num_row_   << "\n"
+          << "Number of weights should be equal to number of instances or number of groups.";
+    }
   }
 
   // model parameter

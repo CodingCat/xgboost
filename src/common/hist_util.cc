@@ -35,30 +35,43 @@ void HistCutMatrix::Init(DMatrix* p_fmat, uint32_t max_num_bins) {
 
   const int nthread = omp_get_max_threads();
 
-  auto nstep = static_cast<unsigned>((info.num_col_ + nthread - 1) / nthread);
-  auto ncol = static_cast<unsigned>(info.num_col_);
+  unsigned const nstep =
+      static_cast<unsigned>((info.num_col_ + nthread - 1) / nthread);
+  unsigned const ncol = static_cast<unsigned>(info.num_col_);
   sketchs.resize(info.num_col_);
   for (auto& s : sketchs) {
     s.Init(info.num_row_, 1.0 / (max_num_bins * kFactor));
   }
 
   const auto& weights = info.weights_.HostVector();
+
   for (const auto &batch : p_fmat->GetRowBatches()) {
-    #pragma omp parallel num_threads(nthread)
+#pragma omp parallel num_threads(nthread)
     {
       CHECK_EQ(nthread, omp_get_num_threads());
       auto tid = static_cast<unsigned>(omp_get_thread_num());
       unsigned begin = std::min(nstep * tid, ncol);
       unsigned end = std::min(nstep * (tid + 1), ncol);
+
+      // Data group, used in ranking.
+      size_t group_ind = tid * static_cast<unsigned>(
+          (info.group_ptr_.size() + nthread - 1) / nthread);;
       // do not iterate if no columns are assigned to the thread
       if (begin < end && end <= ncol) {
         for (size_t i = 0; i < batch.Size(); ++i) { // NOLINT(*)
           size_t ridx = batch.base_rowid + i;
           SparsePage::Inst inst = batch[i];
-          for (auto& ins : inst) {
-            if (ins.index >= begin && ins.index < end) {
-              sketchs[ins.index].Push(ins.fvalue,
-                                      weights.size() > 0 ? weights[ridx] : 1.0f);
+          if (info.group_ptr_.size() != 0 &&
+              info.group_ptr_[group_ind] == ridx &&
+              group_ind < info.group_ptr_.size() - 2) {
+            group_ind ++;
+            CHECK_GT(info.group_ptr_[group_ind], info.group_ptr_[group_ind-1]);
+          }
+          for (auto& entry : inst) {
+            if (entry.index >= begin && entry.index < end) {
+              size_t w_idx = info.group_ptr_.size() > 0 ? group_ind : ridx;
+              sketchs[entry.index].Push(entry.fvalue,
+                                        weights.size() > 0 ? weights[w_idx] : 1.0f);
             }
           }
         }
