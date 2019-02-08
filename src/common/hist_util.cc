@@ -53,24 +53,30 @@ void HistCutMatrix::Init(DMatrix* p_fmat, uint32_t max_num_bins) {
       unsigned begin = std::min(nstep * tid, ncol);
       unsigned end = std::min(nstep * (tid + 1), ncol);
 
-      // Data group, used in ranking.
-      size_t group_ind = tid * static_cast<unsigned>(
-          (info.group_ptr_.size() + nthread - 1) / nthread);;
+      // Data groups, used in ranking.
+      std::vector<bst_uint> const& groups = info.group_ptr_;
+      size_t const num_groups = groups.size() == 0 ? 0 : groups.size() - 1;
+      size_t group_ind =  // index into groups
+          tid * static_cast<unsigned>((num_groups + nthread - 1) / nthread);
+      // Do we need to use this index?
+      bool const use_group_ind = num_groups != 0 && weights.size() != info.num_row_;
       // do not iterate if no columns are assigned to the thread
       if (begin < end && end <= ncol) {
         for (size_t i = 0; i < batch.Size(); ++i) { // NOLINT(*)
           size_t ridx = batch.base_rowid + i;
           SparsePage::Inst inst = batch[i];
-          if (info.group_ptr_.size() != 0 &&
-              info.group_ptr_[group_ind] == ridx &&
-              group_ind < info.group_ptr_.size() - 2) {
+          if (use_group_ind &&
+              groups[group_ind] == ridx &&
+              // maximum equals to weights.size() - 1
+              group_ind < num_groups - 1) {
+            // move to next group
             group_ind++;
           }
           for (auto& entry : inst) {
             if (entry.index >= begin && entry.index < end) {
-              size_t w_idx = info.group_ptr_.size() > 0 ? group_ind : ridx;
+              size_t w_idx = use_group_ind ? group_ind : ridx;
               sketchs[entry.index].Push(entry.fvalue,
-                                        weights.size() > 0 ? weights[w_idx] : 1.0f);
+                                        weights.size() > 0 ? weights.at(w_idx) : 1.0f);
             }
           }
         }
