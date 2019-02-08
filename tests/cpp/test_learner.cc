@@ -88,6 +88,8 @@ TEST(Learner, CheckGroup) {
   group[4] = 1;
   p_mat->Info().SetInfo("group", group.data(), DataType::kUInt32, kNumGroups+1);
   EXPECT_ANY_THROW(learner->UpdateOneIter(0, p_mat.get()));
+
+  delete pp_mat;
 }
 
 }  // namespace xgboost
