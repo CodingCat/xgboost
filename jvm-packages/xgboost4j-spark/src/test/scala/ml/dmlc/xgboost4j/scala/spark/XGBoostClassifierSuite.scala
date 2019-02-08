@@ -16,7 +16,7 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
-import ml.dmlc.xgboost4j.scala.{DMatrix, XGBoost => ScalaXGBoost}
+import ml.dmlc.xgboost4j.scala.{DMatrix, ObjectiveTrait, XGBoost => ScalaXGBoost}
 
 import org.apache.spark.ml.linalg._
 import org.apache.spark.ml.param.ParamMap

@@ -99,7 +99,6 @@ class XGBoostGeneralSuite extends FunSuite with PerTest {
     assert(eval.eval(model._booster.predict(testDM, outPutMargin = true), testDM) < 0.1)
   }
 
-
   test("training with Scala-implemented Rabit tracker") {
     val eval = new EvalError()
     val training = buildDataFrame(Classification.train)

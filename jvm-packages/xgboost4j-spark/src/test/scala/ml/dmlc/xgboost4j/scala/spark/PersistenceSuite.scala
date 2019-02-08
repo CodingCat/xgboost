@@ -19,13 +19,21 @@ package ml.dmlc.xgboost4j.scala.spark
 import java.io.{File, FileNotFoundException}
 import java.util.Arrays
 
-import ml.dmlc.xgboost4j.scala.DMatrix
+import scala.collection.mutable.ListBuffer
 
+import ml.dmlc.xgboost4j.scala.{DMatrix, ObjectiveTrait}
 import scala.util.Random
+
+import ml.dmlc.xgboost4j.java.XGBoostError
+import ml.dmlc.xgboost4j.scala.spark.params.DefaultXGBoostParamsWriter
+import org.apache.commons.logging.{Log, LogFactory}
+
 import org.apache.spark.ml.feature._
 import org.apache.spark.ml.{Pipeline, PipelineModel}
 import org.apache.spark.network.util.JavaUtils
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
+
+import org.apache.spark.SparkContext
 
 class PersistenceSuite extends FunSuite with PerTest with BeforeAndAfterAll {
 
@@ -161,6 +169,26 @@ class PersistenceSuite extends FunSuite with PerTest with BeforeAndAfterAll {
     assert(xgbModel.getEta === xgbModel2.getEta)
     assert(xgbModel.getNumRound === xgbModel2.getNumRound)
     assert(xgbModel.getRawPredictionCol === xgbModel2.getRawPredictionCol)
+  }
+
+  test("test persistence of XGBoostClassificationModel with customizedObj and" +
+    " customizedEval") {
+    val r = new Random(0)
+    // maybe move to shared context, but requires session to import implicits
+    val df = ss.createDataFrame(Seq.fill(100)(r.nextInt(2)).map(i => (i, i))).
+      toDF("feature", "label")
+
+    val assembler = new VectorAssembler()
+      .setInputCols(df.columns.filter(!_.contains("label")))
+      .setOutputCol("features")
+    val transformedDF = assembler.transform(df)
+
+    val paramMap = Map("eta" -> "0.1", "max_depth" -> "6", "silent" -> "1",
+      "objective" -> "binary:logistic", "num_round" -> "10", "num_workers" -> numWorkers)
+    val xgb = new XGBoostClassifier(paramMap).setCustomObj(new LogRegObj(1)).
+      setObjectiveType("regression")
+    val xgbModel = xgb.fit(transformedDF)
+    DefaultXGBoostParamsWriter.getMetadataToSave(xgbModel, SparkContext.getOrCreate(), None, None)
   }
 }
 
