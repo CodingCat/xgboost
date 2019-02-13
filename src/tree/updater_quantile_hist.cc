@@ -362,7 +362,8 @@ void QuantileHistMaker::Builder::InitData(const GHistIndexMatrix& gmat,
                            param_.colsample_bylevel, param_.colsample_bytree,  false);
     }
   }
-  if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased) {
+  if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased ||
+    rabit::IsDistributed()) {
     /* specialized code for dense data:
        choose the column that has a least positive number of discrete bins.
        For dense data (with no missing value),
@@ -370,12 +371,17 @@ void QuantileHistMaker::Builder::InitData(const GHistIndexMatrix& gmat,
     const std::vector<uint32_t>& row_ptr = gmat.cut.row_ptr;
     const auto nfeature = static_cast<bst_uint>(row_ptr.size() - 1);
     uint32_t min_nbins_per_feature = 0;
+    uint32_t max_nbins_per_feature = 0;
     for (bst_uint i = 0; i < nfeature; ++i) {
       const uint32_t nbins = row_ptr[i + 1] - row_ptr[i];
       if (nbins > 0) {
         if (min_nbins_per_feature == 0 || min_nbins_per_feature > nbins) {
           min_nbins_per_feature = nbins;
           fid_least_bins_ = i;
+        }
+        if (max_nbins_per_feature == 0 || max_nbins_per_feature < nbins) {
+          max_nbins_per_feature = nbins;
+          fid_most_bins_ = i;
         }
       }
     }
@@ -628,13 +634,18 @@ void QuantileHistMaker::Builder::InitNewNode(int nid,
       // in distributed mode, the node's stats should be calculated from histogram, otherwise,
       // we will have wrong results in EnumerateSplit()
       // here we take the last feature in cut
+      int fid = 0;
+      if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased) {
+        fid = fid_least_bins_;
+      } else {
+        fid = fid_most_bins_;
+      }
       auto begin = hist.data();
-      for (size_t i = gmat.cut.row_ptr[0]; i < gmat.cut.row_ptr[1]; i++) {
+      for (size_t i = gmat.cut.row_ptr[fid]; i < gmat.cut.row_ptr[fid + 1]; i++) {
         stats.Add(begin[i].sum_grad, begin[i].sum_hess);
       }
     } else {
-      if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased ||
-          rabit::IsDistributed()) {
+      if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased) {
         /* specialized code for dense data
            For dense data (with no missing value),
            the sum of gradient histogram is equal to snode[nid]

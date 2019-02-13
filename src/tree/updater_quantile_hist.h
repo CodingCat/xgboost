@@ -206,6 +206,8 @@ class QuantileHistMaker: public TreeUpdater {
     /*! \brief feature with least # of bins. to be used for dense specialization
                of InitNewNode() */
     uint32_t fid_least_bins_;
+    /*! \brief feature with most # of bins. to be used for sparse data in distributed training */
+    uint32_t fid_most_bins_;
     /*! \brief local prediction cache; maps node id to leaf value */
     std::vector<float> leaf_value_cache_;
 
