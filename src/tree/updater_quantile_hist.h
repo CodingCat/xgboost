@@ -103,7 +103,7 @@ class QuantileHistMaker: public TreeUpdater {
       } else {
         hist_builder_.BuildHist(gpair, row_indices, gmat, hist);
       }
-      this->histred_.Allreduce(hist.data(), hist_builder_.GetNumBins());
+      this->histred_.Allreduce(hist.data(), hist_builder_.GetNumBins() + 1);
     }
 
     inline void SubtractionTrick(GHistRow self, GHistRow sibling, GHistRow parent) {
@@ -154,6 +154,10 @@ class QuantileHistMaker: public TreeUpdater {
                      const std::vector<GradientPair>& gpair,
                      const DMatrix& fmat,
                      const RegTree& tree);
+
+    void CalculateWeight(int nid,
+                         const RegTree& tree,
+                         GHistRow hist);
 
     // enumerate the split values of specific feature
     void EnumerateSplit(int d_step,
@@ -206,6 +210,8 @@ class QuantileHistMaker: public TreeUpdater {
     /*! \brief feature with least # of bins. to be used for dense specialization
                of InitNewNode() */
     uint32_t fid_least_bins_;
+    /*! \brief feature with most # of bins. to be used for sparse data in distributed training */
+    uint32_t fid_most_bins_;
     /*! \brief local prediction cache; maps node id to leaf value */
     std::vector<float> leaf_value_cache_;
 

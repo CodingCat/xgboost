@@ -121,12 +121,14 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
   for (int nid = 0; nid < p_tree->param.num_roots; ++nid) {
     tstart = dmlc::GetTime();
     hist_.AddHistRow(nid);
+    this->InitNewNode(nid, gmat, gpair_h, *p_fmat, *p_tree);
+    time_init_new_node += dmlc::GetTime() - tstart;
+
+    tstart = dmlc::GetTime();
     BuildHist(gpair_h, row_set_collection_[nid], gmat, gmatb, hist_[nid]);
     time_build_hist += dmlc::GetTime() - tstart;
 
-    tstart = dmlc::GetTime();
-    this->InitNewNode(nid, gmat, gpair_h, *p_fmat, *p_tree);
-    time_init_new_node += dmlc::GetTime() - tstart;
+    this->CalculateWeight(nid, *p_tree, hist_[nid]);
 
     tstart = dmlc::GetTime();
     this->EvaluateSplit(nid, gmat, hist_, *p_fmat, *p_tree);
@@ -150,11 +152,17 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
       this->ApplySplit(nid, gmat, column_matrix, hist_, *p_fmat, p_tree);
       time_apply_split += dmlc::GetTime() - tstart;
 
-      tstart = dmlc::GetTime();
       const int cleft = (*p_tree)[nid].LeftChild();
       const int cright = (*p_tree)[nid].RightChild();
       hist_.AddHistRow(cleft);
       hist_.AddHistRow(cright);
+
+      tstart = dmlc::GetTime();
+      this->InitNewNode(cleft, gmat, gpair_h, *p_fmat, *p_tree);
+      this->InitNewNode(cright, gmat, gpair_h, *p_fmat, *p_tree);
+      bst_uint featureid = snode_[nid].best.SplitIndex();
+      time_init_new_node += dmlc::GetTime() - tstart;
+
       if (rabit::IsDistributed()) {
         // in distributed mode, we need to keep consistent across workers
         BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
@@ -170,13 +178,11 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
       }
       time_build_hist += dmlc::GetTime() - tstart;
 
-      tstart = dmlc::GetTime();
-      this->InitNewNode(cleft, gmat, gpair_h, *p_fmat, *p_tree);
-      this->InitNewNode(cright, gmat, gpair_h, *p_fmat, *p_tree);
-      bst_uint featureid = snode_[nid].best.SplitIndex();
+      this->CalculateWeight(cleft, *p_tree, hist_[cleft]);
+      this->CalculateWeight(cright, *p_tree, hist_[cright]);
+
       spliteval_->AddSplit(nid, cleft, cright, featureid,
                            snode_[cleft].weight, snode_[cright].weight);
-      time_init_new_node += dmlc::GetTime() - tstart;
 
       tstart = dmlc::GetTime();
       this->EvaluateSplit(cleft, gmat, hist_, *p_fmat, *p_tree);
@@ -189,7 +195,6 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
       qexpand_->push(ExpandEntry(cright, p_tree->GetDepth(cright),
                                  snode_[cright].best.loss_chg,
                                  timestamp++));
-
       ++num_leaves;  // give two and take one, as parent is no longer a leaf
     }
   }
@@ -362,7 +367,8 @@ void QuantileHistMaker::Builder::InitData(const GHistIndexMatrix& gmat,
                            param_.colsample_bylevel, param_.colsample_bytree,  false);
     }
   }
-  if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased) {
+  if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased ||
+    rabit::IsDistributed()) {
     /* specialized code for dense data:
        choose the column that has a least positive number of discrete bins.
        For dense data (with no missing value),
@@ -370,12 +376,17 @@ void QuantileHistMaker::Builder::InitData(const GHistIndexMatrix& gmat,
     const std::vector<uint32_t>& row_ptr = gmat.cut.row_ptr;
     const auto nfeature = static_cast<bst_uint>(row_ptr.size() - 1);
     uint32_t min_nbins_per_feature = 0;
+    uint32_t max_nbins_per_feature = 0;
     for (bst_uint i = 0; i < nfeature; ++i) {
       const uint32_t nbins = row_ptr[i + 1] - row_ptr[i];
       if (nbins > 0) {
         if (min_nbins_per_feature == 0 || min_nbins_per_feature > nbins) {
           min_nbins_per_feature = nbins;
           fid_least_bins_ = i;
+        }
+        if (max_nbins_per_feature == 0 || max_nbins_per_feature < nbins) {
+          max_nbins_per_feature = nbins;
+          fid_most_bins_ = i;
         }
       }
     }
@@ -612,6 +623,20 @@ void QuantileHistMaker::Builder::ApplySplitSparseData(
   }
 }
 
+void QuantileHistMaker::Builder::CalculateWeight(int nid,
+                                                 const RegTree &tree,
+                                                 GHistRow hist) {
+  // sync node stats from synced histogram first
+  if (rabit::IsDistributed()) {
+    snode_[nid].stats = hist[hist_builder_.GetNumBins()];
+  }
+  bst_uint parentid = tree[nid].Parent();
+  snode_[nid].weight = static_cast<float>(
+          spliteval_->ComputeWeight(parentid, snode_[nid].stats));
+  snode_[nid].root_gain = static_cast<float>(
+          spliteval_->ComputeScore(parentid, snode_[nid].stats, snode_[nid].weight));
+}
+
 void QuantileHistMaker::Builder::InitNewNode(int nid,
                                              const GHistIndexMatrix& gmat,
                                              const std::vector<GradientPair>& gpair,
@@ -625,16 +650,12 @@ void QuantileHistMaker::Builder::InitNewNode(int nid,
     auto& stats = snode_[nid].stats;
     GHistRow hist = hist_[nid];
     if (rabit::IsDistributed()) {
-      // in distributed mode, the node's stats should be calculated from histogram, otherwise,
-      // we will have wrong results in EnumerateSplit()
-      // here we take the last feature in cut
-      auto begin = hist.data();
-      for (size_t i = gmat.cut.row_ptr[0]; i < gmat.cut.row_ptr[1]; i++) {
-        stats.Add(begin[i].sum_grad, begin[i].sum_hess);
+      const RowSetCollection::Elem e = row_set_collection_[nid];
+      for (const size_t* it = e.begin; it < e.end; ++it) {
+        stats.Add(gpair[*it]);
       }
     } else {
-      if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased ||
-          rabit::IsDistributed()) {
+      if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased) {
         /* specialized code for dense data
            For dense data (with no missing value),
            the sum of gradient histogram is equal to snode[nid]
@@ -655,14 +676,9 @@ void QuantileHistMaker::Builder::InitNewNode(int nid,
         }
       }
     }
-
-    // calculating the weights
-    {
-      bst_uint parentid = tree[nid].Parent();
-      snode_[nid].weight = static_cast<float>(
-          spliteval_->ComputeWeight(parentid, snode_[nid].stats));
-      snode_[nid].root_gain = static_cast<float>(
-          spliteval_->ComputeScore(parentid, snode_[nid].stats, snode_[nid].weight));
+    // if in distributed mode we put the node stats in the last bin of HistRow for syncing
+    if (rabit::IsDistributed()) {
+      hist_[nid].data()[hist_builder_.GetNumBins()] =  snode_[nid].stats;
     }
   }
 }
