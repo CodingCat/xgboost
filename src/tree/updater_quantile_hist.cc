@@ -122,12 +122,13 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
     tstart = dmlc::GetTime();
     hist_.AddHistRow(nid);
     this->InitNewNode(nid, gmat, gpair_h, *p_fmat, *p_tree);
-    hist_[nid].data()[hist_builder_.GetNumBins()] =  snode_[nid].stats;
     time_init_new_node += dmlc::GetTime() - tstart;
 
     tstart = dmlc::GetTime();
     BuildHist(gpair_h, row_set_collection_[nid], gmat, gmatb, hist_[nid]);
     time_build_hist += dmlc::GetTime() - tstart;
+
+    this->CalculateWeight(nid, *p_tree, hist_[nid]);
 
     tstart = dmlc::GetTime();
     this->EvaluateSplit(nid, gmat, hist_, *p_fmat, *p_tree);
@@ -160,18 +161,17 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
       this->InitNewNode(cleft, gmat, gpair_h, *p_fmat, *p_tree);
       this->InitNewNode(cright, gmat, gpair_h, *p_fmat, *p_tree);
       bst_uint featureid = snode_[nid].best.SplitIndex();
-      spliteval_->AddSplit(nid, cleft, cright, featureid,
-                           snode_[cleft].weight, snode_[cright].weight);
-      hist_[cleft].data()[hist_builder_.GetNumBins()] =  snode_[cleft].stats;
-      hist_[cright].data()[hist_builder_.GetNumBins()] =  snode_[cright].stats;
       time_init_new_node += dmlc::GetTime() - tstart;
-
-      std::cout << "added left and right\n";
 
       if (rabit::IsDistributed()) {
         // in distributed mode, we need to keep consistent across workers
         BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
         SubtractionTrick(hist_[cright], hist_[cleft], hist_[nid]);
+        std::cout << "second last slot of right child " <<
+                  hist_[cright][hist_builder_.GetNumBins() - 1].sum_grad << "," <<
+                  hist_[cright][hist_builder_.GetNumBins() - 1].sum_hess << "\n";
+        std::cout << "last slot of right child " <<
+          hist_[cright][hist_builder_.GetNumBins()].sum_grad << "," << hist_[cright][hist_builder_.GetNumBins()].sum_hess << "\n";
       } else {
         if (row_set_collection_[cleft].Size() < row_set_collection_[cright].Size()) {
           BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
@@ -183,7 +183,11 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
       }
       time_build_hist += dmlc::GetTime() - tstart;
 
-      std::cout << "build histogram for left and right\n";
+      this->CalculateWeight(cleft, *p_tree, hist_[cleft]);
+      this->CalculateWeight(cright, *p_tree, hist_[cright]);
+
+      spliteval_->AddSplit(nid, cleft, cright, featureid,
+                           snode_[cleft].weight, snode_[cright].weight);
 
       tstart = dmlc::GetTime();
       this->EvaluateSplit(cleft, gmat, hist_, *p_fmat, *p_tree);
@@ -196,8 +200,6 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
       qexpand_->push(ExpandEntry(cright, p_tree->GetDepth(cright),
                                  snode_[cright].best.loss_chg,
                                  timestamp++));
-      std::cout << "evaluated split for left and right\n";
-
       ++num_leaves;  // give two and take one, as parent is no longer a leaf
     }
   }
@@ -626,6 +628,22 @@ void QuantileHistMaker::Builder::ApplySplitSparseData(
   }
 }
 
+void QuantileHistMaker::Builder::CalculateWeight(int nid,
+                                                 const RegTree &tree,
+                                                 GHistRow hist) {
+  // sync node stats from synced histogram first
+  if (rabit::IsDistributed()) {
+    snode_[nid].stats = hist[hist_builder_.GetNumBins()];
+    // std::cout << "node " << nid << "'s stats is " << snode_[nid].stats.sum_grad
+    //  << "," << snode_[nid].stats.sum_hess << "\n";
+  }
+  bst_uint parentid = tree[nid].Parent();
+  snode_[nid].weight = static_cast<float>(
+          spliteval_->ComputeWeight(parentid, snode_[nid].stats));
+  snode_[nid].root_gain = static_cast<float>(
+          spliteval_->ComputeScore(parentid, snode_[nid].stats, snode_[nid].weight));
+}
+
 void QuantileHistMaker::Builder::InitNewNode(int nid,
                                              const GHistIndexMatrix& gmat,
                                              const std::vector<GradientPair>& gpair,
@@ -639,20 +657,6 @@ void QuantileHistMaker::Builder::InitNewNode(int nid,
     auto& stats = snode_[nid].stats;
     GHistRow hist = hist_[nid];
     if (rabit::IsDistributed()) {
-      // in distributed mode, the node's stats should be calculated from histogram, otherwise,
-      // we will have wrong results in EnumerateSplit()
-      // here we take the last feature in cut
-      /*
-      int fid = 0;
-      if (data_layout_ == kDenseDataZeroBased || data_layout_ == kDenseDataOneBased) {
-        fid = fid_least_bins_;
-      } else {
-        fid = fid_most_bins_;
-      }
-      auto begin = hist.data();
-      for (size_t i = gmat.cut.row_ptr[fid]; i < gmat.cut.row_ptr[fid + 1]; i++) {
-        stats.Add(begin[i].sum_grad, begin[i].sum_hess);
-      }*/
       const RowSetCollection::Elem e = row_set_collection_[nid];
       for (const size_t* it = e.begin; it < e.end; ++it) {
         stats.Add(gpair[*it]);
@@ -679,14 +683,9 @@ void QuantileHistMaker::Builder::InitNewNode(int nid,
         }
       }
     }
-
-    // calculating the weights
-    {
-      bst_uint parentid = tree[nid].Parent();
-      snode_[nid].weight = static_cast<float>(
-          spliteval_->ComputeWeight(parentid, snode_[nid].stats));
-      snode_[nid].root_gain = static_cast<float>(
-          spliteval_->ComputeScore(parentid, snode_[nid].stats, snode_[nid].weight));
+    // if in distributed mode we put the node stats in the last bin of HistRow for syncing
+    if (rabit::IsDistributed()) {
+      hist_[nid].data()[hist_builder_.GetNumBins()] =  snode_[nid].stats;
     }
   }
 }
@@ -706,8 +705,6 @@ void QuantileHistMaker::Builder::EnumerateSplit(int d_step,
   const std::vector<uint32_t>& cut_ptr = gmat.cut.row_ptr;
   const std::vector<bst_float>& cut_val = gmat.cut.cut;
 
-  const GradStats &node_stats = rabit::IsDistributed() ? hist.data()[hist_builder_.GetNumBins()] :
-          snode.stats;
   // statistics on both sides of split
   GradStats c;
   GradStats e;
@@ -738,7 +735,7 @@ void QuantileHistMaker::Builder::EnumerateSplit(int d_step,
     // try to find a split
     e.Add(hist[i].GetGrad(), hist[i].GetHess());
     if (e.sum_hess >= param_.min_child_weight) {
-      c.SetSubstract(node_stats, e);
+      c.SetSubstract(snode.stats, e);
       if (c.sum_hess >= param_.min_child_weight) {
         bst_float loss_chg;
         bst_float split_pt;

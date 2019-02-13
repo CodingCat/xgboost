@@ -155,6 +155,10 @@ class QuantileHistMaker: public TreeUpdater {
                      const DMatrix& fmat,
                      const RegTree& tree);
 
+    void CalculateWeight(int nid,
+                         const RegTree& tree,
+                         GHistRow hist);
+
     // enumerate the split values of specific feature
     void EnumerateSplit(int d_step,
                         const GHistIndexMatrix& gmat,
