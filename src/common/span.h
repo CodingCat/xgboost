@@ -485,9 +485,6 @@ class Span {
   }
 
   XGBOOST_DEVICE reference operator[](index_type _idx) const {
-    if (_idx >= size() || _idx < 0) {
-      std::cout << "_idx: " << _idx << " size: " << size() << "\n";
-    }
     SPAN_CHECK(_idx >= 0 && _idx < size());
     return data()[_idx];
   }

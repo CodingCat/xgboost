@@ -167,11 +167,6 @@ void QuantileHistMaker::Builder::Update(const GHistIndexMatrix& gmat,
         // in distributed mode, we need to keep consistent across workers
         BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
         SubtractionTrick(hist_[cright], hist_[cleft], hist_[nid]);
-        std::cout << "second last slot of right child " <<
-                  hist_[cright][hist_builder_.GetNumBins() - 1].sum_grad << "," <<
-                  hist_[cright][hist_builder_.GetNumBins() - 1].sum_hess << "\n";
-        std::cout << "last slot of right child " <<
-          hist_[cright][hist_builder_.GetNumBins()].sum_grad << "," << hist_[cright][hist_builder_.GetNumBins()].sum_hess << "\n";
       } else {
         if (row_set_collection_[cleft].Size() < row_set_collection_[cright].Size()) {
           BuildHist(gpair_h, row_set_collection_[cleft], gmat, gmatb, hist_[cleft]);
@@ -634,8 +629,6 @@ void QuantileHistMaker::Builder::CalculateWeight(int nid,
   // sync node stats from synced histogram first
   if (rabit::IsDistributed()) {
     snode_[nid].stats = hist[hist_builder_.GetNumBins()];
-    // std::cout << "node " << nid << "'s stats is " << snode_[nid].stats.sum_grad
-    //  << "," << snode_[nid].stats.sum_hess << "\n";
   }
   bst_uint parentid = tree[nid].Parent();
   snode_[nid].weight = static_cast<float>(
