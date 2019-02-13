@@ -166,7 +166,16 @@ class HistCollection {
     CHECK_EQ(row_ptr_[nid], kMax);
 
     row_ptr_[nid] = data_.size();
-    data_.resize(data_.size() + nbins_);
+    // add an additional slot for syncing node stats
+    if (rabit::IsDistributed()) {
+      data_.resize(data_.size() + nbins_ + 1);
+    } else {
+      data_.resize(data_.size() + nbins_);
+    }
+  }
+
+  std::vector<tree::GradStats> GetData() {
+    return data_;
   }
 
  private:
