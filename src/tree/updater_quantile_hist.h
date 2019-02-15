@@ -107,7 +107,7 @@ class QuantileHistMaker: public TreeUpdater {
         hist_builder_.BuildHist(gpair, row_indices, gmat, hist);
       }
       if (sync_hist) {
-        this->histred_.Allreduce(hist.data(), hist_builder_.GetNumBins());
+        this->histred_.Allreduce(hist.data(), hist_builder_.GetNumBins() + 1);
       }
     }
 
@@ -242,6 +242,14 @@ class QuantileHistMaker: public TreeUpdater {
                               bst_int split_cond,
                               bool default_left);
 
+    void AddNodeSplits(RegTree *p_tree);
+
+    void CalculateNodeWeights(RegTree *p_tree);
+
+    void CalculateWeight(int nid,
+                         const RegTree &tree,
+                         GHistRow hist);
+
     void InitNewNode(int nid,
                      const GHistIndexMatrix& gmat,
                      const std::vector<GradientPair>& gpair,
@@ -347,7 +355,6 @@ class QuantileHistMaker: public TreeUpdater {
     DataLayout data_layout_;
 
     TreeGrowingPerfMonitor perf_monitor;
-
     rabit::Reducer<GradStats, GradStats::Reduce> histred_;
   };
 
