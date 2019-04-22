@@ -415,7 +415,8 @@ class XGBoostClassificationModel private[ml](
 
     // Output selected columns only.
     // This is a bit complicated since it tries to avoid repeated computation.
-    var outputData = transformInternal(dataset)
+    var outputData = transformInternal(dataset.sortWithinPartitions(
+      dataset.columns.head, dataset.columns.tail.toSeq: _*))
     var numColsOutput = 0
 
     val rawPredictionUDF = udf { rawPrediction: mutable.WrappedArray[Float] =>
