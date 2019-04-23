@@ -375,7 +375,7 @@ class XGBoostRegressionModel private[ml] (
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     transformSchema(dataset.schema, logging = true)
-
+    logInfo("running duplicating version")
     // Output selected columns only.
     // This is a bit complicated since it tries to avoid repeated computation.
     var outputData = transformInternal(dataset)
