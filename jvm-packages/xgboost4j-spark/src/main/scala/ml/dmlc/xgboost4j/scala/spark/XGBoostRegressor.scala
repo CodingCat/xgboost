@@ -260,21 +260,14 @@ class XGBoostRegressionModel private[ml] (
 
     val bBooster = dataset.sparkSession.sparkContext.broadcast(_booster)
     val appName = dataset.sparkSession.sparkContext.appName
-
-    val resultRDD = dataset.asInstanceOf[Dataset[Row]].rdd.mapPartitions { rowIterator =>
+    val inputRDD = dataset.asInstanceOf[Dataset[Row]].rdd
+    val predictionRDD = dataset.asInstanceOf[Dataset[Row]].rdd.mapPartitions { rowIterator =>
       if (rowIterator.hasNext) {
         val rabitEnv = Array("DMLC_TASK_ID" -> TaskContext.getPartitionId().toString).toMap
         Rabit.init(rabitEnv.asJava)
-
+        val featuresIterator = rowIterator.map(row => row.getAs[Vector](
+          $(featuresCol))).toList.iterator
         import DataUtils._
-
-        val rowBuffer = mutable.ArrayBuffer[Row]()
-        val featureBuffer = mutable.ArrayBuffer[XGBLabeledPoint]()
-        rowIterator.foreach { row =>
-          rowBuffer += row
-          featureBuffer += row.getAs[Vector]($(featuresCol)).asXGB
-        }
-
         val cacheInfo = {
           if ($(useExternalMemory)) {
             s"$appName-${TaskContext.get().stageId()}-dtest_cache-${TaskContext.getPartitionId()}"
@@ -282,16 +275,14 @@ class XGBoostRegressionModel private[ml] (
             null
           }
         }
-
         val dm = new DMatrix(
-          XGBoost.processMissingValues(featureBuffer.iterator, $(missing)),
+          XGBoost.processMissingValues(featuresIterator.map(_.asXGB), $(missing)),
           cacheInfo)
         try {
           val Array(originalPredictionItr, predLeafItr, predContribItr) =
             producePredictionItrs(bBooster, dm)
           Rabit.shutdown()
-          produceResultIterator(rowBuffer.iterator,
-            originalPredictionItr, predLeafItr, predContribItr)
+          Iterator(originalPredictionItr, predLeafItr, predContribItr)
         } finally {
           dm.delete()
         }
@@ -299,7 +290,15 @@ class XGBoostRegressionModel private[ml] (
         Iterator()
       }
     }
-
+    val resultRDD = inputRDD.zipPartitions(predictionRDD, preservesPartitioning = true) {
+      case (inputIterator, predictionItr) =>
+        if (inputIterator.hasNext) {
+          produceResultIterator(inputIterator, predictionItr.next(), predictionItr.next(),
+            predictionItr.next())
+        } else {
+          Iterator()
+        }
+    }
     bBooster.unpersist(blocking = false)
     dataset.sparkSession.createDataFrame(resultRDD, generateResultSchema(schema))
   }
@@ -375,10 +374,11 @@ class XGBoostRegressionModel private[ml] (
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     transformSchema(dataset.schema, logging = true)
-    logInfo("running duplicating version")
+    logInfo("running sorting version")
     // Output selected columns only.
     // This is a bit complicated since it tries to avoid repeated computation.
-    var outputData = transformInternal(dataset)
+    var outputData = transformInternal(dataset.sortWithinPartitions(dataset.columns.head,
+      dataset.columns.tail: _*))
     var numColsOutput = 0
 
     val predictUDF = udf { (originalPrediction: mutable.WrappedArray[Float]) =>
