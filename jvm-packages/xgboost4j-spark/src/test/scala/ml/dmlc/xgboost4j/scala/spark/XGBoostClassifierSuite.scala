@@ -60,6 +60,7 @@ class XGBoostClassifierSuite extends FunSuite with PerTest {
     }
 
     val prediction3 = model1.predict(testDM, outPutMargin = true)
+    model2.transform(testDF).show()
     val prediction4 = model2.transform(testDF).
       collect().map(row => (row.getAs[Int]("id"), row.getAs[DenseVector]("rawPrediction"))).toMap
 
