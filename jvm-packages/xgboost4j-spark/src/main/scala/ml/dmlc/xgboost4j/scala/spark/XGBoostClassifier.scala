@@ -290,6 +290,7 @@ class XGBoostClassificationModel private[ml](
 
         private val batchIterImpl = rowIterator.grouped(
           XGBoostClassificationModel.PREDICTION_BATCH_SIZE).flatMap { batchRow =>
+
           if (batchCnt == 0) {
             val rabitEnv = Array("DMLC_TASK_ID" -> TaskContext.getPartitionId().toString).toMap
             Rabit.init(rabitEnv.asJava)
