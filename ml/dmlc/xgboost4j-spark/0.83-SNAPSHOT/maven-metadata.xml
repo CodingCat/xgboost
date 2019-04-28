@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>ml.dmlc</groupId>
+  <artifactId>xgboost4j-spark</artifactId>
+  <version>0.83-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <timestamp>20190428.000711</timestamp>
+      <buildNumber>1</buildNumber>
+    </snapshot>
+    <lastUpdated>20190428000711</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>0.83-20190428.000711-1</value>
+        <updated>20190428000711</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>0.83-20190428.000711-1</value>
+        <updated>20190428000711</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>
