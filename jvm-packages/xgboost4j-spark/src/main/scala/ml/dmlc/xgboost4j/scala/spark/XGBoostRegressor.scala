@@ -244,6 +244,11 @@ class XGBoostRegressionModel private[ml] (
 
   def setMissing(value: Float): this.type = set(missing, value)
 
+  def setAllowZeroForMissingValue(value: Boolean): this.type = set(
+    allowNonZeroForMissingValue,
+    value
+  )
+
   def setInferBatchSize(value: Int): this.type = set(inferBatchSize, value)
 
   /**
@@ -252,7 +257,11 @@ class XGBoostRegressionModel private[ml] (
    */
   override def predict(features: Vector): Double = {
     import DataUtils._
-    val dm = new DMatrix(XGBoost.processMissingValues(Iterator(features.asXGB), $(missing)))
+    val dm = new DMatrix(XGBoost.processMissingValues(
+      Iterator(features.asXGB),
+      $(missing),
+      $(allowNonZeroForMissingValue)
+    ))
     _booster.predict(data = dm)(0)(0)
   }
 
@@ -290,7 +299,11 @@ class XGBoostRegressionModel private[ml] (
           }
 
           val dm = new DMatrix(
-            XGBoost.processMissingValues(features.map(_.asXGB), $(missing)),
+            XGBoost.processMissingValues(
+              features.map(_.asXGB),
+              $(missing),
+              $(allowNonZeroForMissingValue)
+            ),
             cacheInfo)
           try {
             val Array(rawPredictionItr, predLeafItr, predContribItr) =
