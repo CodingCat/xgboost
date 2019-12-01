@@ -421,7 +421,7 @@ class LearnerImpl : public Learner {
     this->Configure();
     this->CheckDataSplitMode();
     this->ValidateDMatrix(train);
-
+    std::cout << "updating iteration " << iter << "\n";
     monitor_.Start("PredictRaw");
     this->PredictRaw(train, &preds_[train]);
     monitor_.Stop("PredictRaw");

@@ -103,6 +103,7 @@ class CPUPredictor : public Predictor {
   void PredLoopInternal(DMatrix* dmat, std::vector<bst_float>* out_preds,
                         const gbm::GBTreeModel& model, int tree_begin,
                         unsigned ntree_limit) {
+    std::cout << "running PredLoopInternal\n";
     // TODO(Rory): Check if this specialisation actually improves performance
     PredLoopSpecalize(dmat, out_preds, model, model.param.num_output_group,
                       tree_begin, ntree_limit);
